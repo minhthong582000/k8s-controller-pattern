@@ -8,6 +8,7 @@ import (
 	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
 	netv1 "k8s.io/api/networking/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appinformers "k8s.io/client-go/informers/apps/v1"
@@ -71,6 +72,8 @@ func (c *Controller) worker() {
 }
 
 func (c *Controller) processNextItem() bool {
+	ctx := context.Background()
+
 	item, shutdown := c.Queue.Get()
 	if shutdown {
 		return false
@@ -92,7 +95,27 @@ func (c *Controller) processNextItem() bool {
 		return false
 	}
 
-	err = c.exposeDeployment(ns, name)
+	// Since we only know about the deployment object,
+	// We have to check with the API server to determine
+	// if the deployment is added or deleted.
+	_, err = c.ClientSet.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+	if apierrors.IsNotFound(err) {
+		fmt.Println("Deployment was deleted")
+
+		err = c.cleanupResources(ctx, ns, name)
+		if err != nil {
+			fmt.Println("Error cleaning up resources", err)
+			return false
+		}
+
+		return true
+	} else if err != nil {
+		fmt.Println("Error getting deployment info", err)
+		return false
+	}
+
+	// Expose the deployment
+	err = c.exposeDeployment(ctx, ns, name)
 	if err != nil {
 		// TODO: Implement retry logic
 		fmt.Println("Error exposing deployment", err)
@@ -102,14 +125,30 @@ func (c *Controller) processNextItem() bool {
 	return true
 }
 
+// cleanupResources will delete the service and ingress
+// created by "exposeDeployment".
+func (c *Controller) cleanupResources(ctx context.Context, namespace, name string) error {
+	err := c.ClientSet.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Service with name %s deleted\n", name)
+
+	err = c.ClientSet.NetworkingV1().Ingresses(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Ingress with name %s deleted\n", name)
+
+	return nil
+}
+
 // exposeDeployment is the main logic of the controller
 //
 // What it does is whenever a new deployment is added,
 // it will create a service to expose the deployment
 // and an ingress to route the traffic.
-func (c *Controller) exposeDeployment(namespace, name string) error {
-	ctx := context.Background()
-
+func (c *Controller) exposeDeployment(ctx context.Context, namespace, name string) error {
 	// Get the deployment
 	deployment, err := c.DeploymentLister.Deployments(namespace).Get(name)
 	if err != nil {
@@ -174,7 +213,7 @@ func (c *Controller) exposeDeployment(namespace, name string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Ingress with Name: ", ingress.Name, " created")
+	fmt.Printf("Ingress with name %s created\n", ingress.Name)
 
 	return nil
 }
