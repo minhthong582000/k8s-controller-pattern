@@ -9,8 +9,9 @@ What it does is whenever a new Deployment is created in "default" namespace, it 
 ## How to run?
 
 ```bash
-go build
-./example-controller \
+go build -o bin/example-controller
+
+bin/example-controller \
     --kubeconfig=$HOME/.kube/config \
     --workers 2 \
     --namespace default

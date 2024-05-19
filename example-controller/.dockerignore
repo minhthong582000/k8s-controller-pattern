@@ -1,0 +1,4 @@
+./example-controller
+*.md
+docs/
+.git

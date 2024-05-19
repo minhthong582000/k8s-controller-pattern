@@ -21,4 +21,5 @@
 go.work
 go.work.sum
 
-example-controller
+# Build file
+bin
