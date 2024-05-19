@@ -10,6 +10,7 @@ import (
 	netv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appinformers "k8s.io/client-go/informers/apps/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,7 +53,8 @@ func NewController(
 }
 
 func (c *Controller) Run(stopCh <-chan struct{}) {
-	fmt.Println("Starting controller")
+	defer utilruntime.HandleCrash()
+	defer c.Queue.ShutDown()
 
 	// Wait for the caches to be synced before starting workers
 	if !cache.WaitForCacheSync(stopCh, c.DeploymentCacheSync) {
@@ -63,7 +65,9 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 	go wait.Until(c.worker, 1*time.Second, stopCh)
 
 	// Block the main thread
+	fmt.Println("Starting controller")
 	<-stopCh
+	fmt.Println("Stopping controller")
 }
 
 func (c *Controller) worker() {
@@ -78,48 +82,66 @@ func (c *Controller) processNextItem() bool {
 	if shutdown {
 		return false
 	}
-	// If everything work as expected, we can forget the item
-	defer c.Queue.Forget(item)
 
-	// Extract the key from the item in namespace/name format
-	key, err := cache.MetaNamespaceKeyFunc(item)
-	if err != nil {
-		fmt.Println("Error getting key from item")
-		return false
-	}
+	// We wrap this block in a func so we can defer c.workqueue.Done.
+	err := func(obj interface{}) error {
+		defer c.Queue.Done(item)
 
-	// Split the key into namespace and name
-	ns, name, err := cache.SplitMetaNamespaceKey(key)
-	if err != nil {
-		fmt.Println("Error splitting key")
-		return false
-	}
-
-	// Since we only know about the deployment object,
-	// We have to check with the API server to determine
-	// if the deployment is added or deleted.
-	_, err = c.ClientSet.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		fmt.Println("Deployment was deleted")
-
-		err = c.cleanupResources(ctx, ns, name)
+		// Extract the key from the item in namespace/name format
+		key, err := cache.MetaNamespaceKeyFunc(item)
 		if err != nil {
-			fmt.Println("Error cleaning up resources", err)
-			return false
+			fmt.Println("Error getting key from item:", err)
+			// Since we can't process the item, we stop processing it
+			c.Queue.Forget(item)
+			return nil
 		}
 
-		return true
-	} else if err != nil {
-		fmt.Println("Error getting deployment info", err)
-		return false
-	}
+		// Split the key into namespace and name
+		ns, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			fmt.Println("Error splitting key:", err)
+			// Since we can't process the item, we stop processing it
+			c.Queue.Forget(item)
+			return nil
+		}
 
-	// Expose the deployment
-	err = c.exposeDeployment(ctx, ns, name)
+		// Since we only know about the deployment object,
+		// We have to check with the API server to determine
+		// if the deployment is added or deleted.
+		_, err = c.ClientSet.AppsV1().Deployments(ns).Get(ctx, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			err = c.cleanupResources(ctx, ns, name)
+			if err != nil {
+				// If there is an error, requeue the item
+				c.Queue.AddRateLimited(obj)
+				fmt.Println("Error cleaning up resources", err)
+				return err
+			}
+
+			return nil
+		} else if err != nil {
+			// If there is an error, requeue the item
+			c.Queue.AddRateLimited(obj)
+			fmt.Println("Error getting deployment info", err)
+			return err
+		}
+
+		// Expose the deployment
+		err = c.exposeDeployment(ctx, ns, name)
+		if err != nil {
+			// If there is an error, requeue the item
+			c.Queue.AddRateLimited(obj)
+			fmt.Println("Error exposing deployment", err)
+			return err
+		}
+
+		c.Queue.Forget(item)
+
+		return nil
+	}(item)
+
 	if err != nil {
-		// TODO: Implement retry logic
-		fmt.Println("Error exposing deployment", err)
-		return false
+		utilruntime.HandleError(err)
 	}
 
 	return true
@@ -221,11 +243,11 @@ func (c *Controller) exposeDeployment(ctx context.Context, namespace, name strin
 // handleAdd will be called every time a new deployment is added
 func (c *Controller) handleAdd(obj interface{}) {
 	fmt.Println("Deployment added")
-	c.Queue.Add(obj)
+	c.Queue.AddRateLimited(obj)
 }
 
 // handleDelete will be called every time a deployment is deleted
 func (c *Controller) handleDelete(obj interface{}) {
 	fmt.Println("Deployment deleted")
-	c.Queue.Add(obj)
+	c.Queue.AddRateLimited(obj)
 }
