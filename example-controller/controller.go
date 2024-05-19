@@ -52,7 +52,7 @@ func NewController(
 	return c
 }
 
-func (c *Controller) Run(stopCh <-chan struct{}) {
+func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) {
 	defer func() {
 		fmt.Println("Cleaning up...")
 		utilruntime.HandleCrash()
@@ -65,8 +65,10 @@ func (c *Controller) Run(stopCh <-chan struct{}) {
 		fmt.Println("Error syncing cache")
 	}
 
-	// Wait every 1 second to process the next item in the queue
-	go wait.Until(c.worker, 1*time.Second, stopCh)
+	for i := 0; i < numWorkers; i++ {
+		// Wait every 1 second to process the next item in the queue
+		go wait.Until(c.worker, 1*time.Second, stopCh)
+	}
 
 	// Block the main thread
 	fmt.Println("Starting controller")

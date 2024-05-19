@@ -10,13 +10,16 @@ What it does is whenever a new Deployment is created in "default" namespace, it 
 
 ```bash
 go build
-./example-controller --kubeconfig=$HOME/.kube/config
+./example-controller \
+    --kubeconfig=$HOME/.kube/config \
+    --workers 2 \
+    --namespace default
 ```
 
 Open another terminal and create a Deployment:
 
 ```bash
-kubectl create -f deployment.yaml
+kubectl create -f ./example/deployment.yaml
 ```
 
 Watch the logs of the controller.

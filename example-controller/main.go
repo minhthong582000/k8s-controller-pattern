@@ -18,6 +18,8 @@ func main() {
 	isInCluster := false
 
 	kubeconfig := flag.String("kubeconfig", "~/.kube/config", "Path to a kubeconfig. Only required if out-of-cluster.")
+	numWorkers := flag.Int("workers", 2, "Number of workers")
+	watchNamespace := flag.String("namespace", "default", "Namespace to watch for deployments")
 	flag.Parse()
 
 	// Set up the kubernetes client
@@ -45,11 +47,10 @@ func main() {
 	// informerFactory := informers.NewSharedInformerFactory(clientSet, resyncTimeout)
 
 	// Create a shared informer factory that watches resources in the "default" namespace
-	namespace := "default"
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(
 		clientSet,
 		resyncTimeout,
-		informers.WithNamespace(namespace),
+		informers.WithNamespace(*watchNamespace),
 	)
 	deploymentInformer := informerFactory.Apps().V1().Deployments()
 
@@ -57,7 +58,7 @@ func main() {
 	stopCh := setupSignalHandler()
 	controller := NewController(clientSet, deploymentInformer)
 	informerFactory.Start(stopCh)
-	controller.Run(stopCh)
+	controller.Run(*numWorkers, stopCh)
 }
 
 // SetupSignalHandler registered for SIGTERM and SIGINT. A stop channel is returned
