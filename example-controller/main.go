@@ -51,8 +51,8 @@ func main() {
 	deploymentInformer := informerFactory.Apps().V1().Deployments()
 
 	// Run the controller
-	ch := make(chan struct{})
+	stopCh := make(chan struct{})
 	controller := NewController(clientSet, deploymentInformer)
-	informerFactory.Start(ch)
-	controller.Run(ch)
+	informerFactory.Start(stopCh)
+	controller.Run(stopCh)
 }

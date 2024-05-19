@@ -51,19 +51,19 @@ func NewController(
 	return c
 }
 
-func (c *Controller) Run(ch <-chan struct{}) {
+func (c *Controller) Run(stopCh <-chan struct{}) {
 	fmt.Println("Starting controller")
 
 	// Wait for the caches to be synced before starting workers
-	if !cache.WaitForCacheSync(ch, c.DeploymentCacheSync) {
+	if !cache.WaitForCacheSync(stopCh, c.DeploymentCacheSync) {
 		fmt.Println("Error syncing cache")
 	}
 
 	// Wait every 1 second to process the next item in the queue
-	go wait.Until(c.worker, 1*time.Second, ch)
+	go wait.Until(c.worker, 1*time.Second, stopCh)
 
-	// Block the main thread to prevent the program from exiting
-	<-ch
+	// Block the main thread
+	<-stopCh
 }
 
 func (c *Controller) worker() {
