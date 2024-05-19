@@ -53,8 +53,12 @@ func NewController(
 }
 
 func (c *Controller) Run(stopCh <-chan struct{}) {
-	defer utilruntime.HandleCrash()
-	defer c.Queue.ShutDown()
+	defer func() {
+		fmt.Println("Cleaning up...")
+		utilruntime.HandleCrash()
+		c.Queue.ShutDown()
+		fmt.Println("Stopped")
+	}()
 
 	// Wait for the caches to be synced before starting workers
 	if !cache.WaitForCacheSync(stopCh, c.DeploymentCacheSync) {
