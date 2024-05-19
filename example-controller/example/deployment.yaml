@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: nginx
-          image: nginx/nginx:latest
+          image: nginx:latest
           resources:
             requests:
               cpu: 10m

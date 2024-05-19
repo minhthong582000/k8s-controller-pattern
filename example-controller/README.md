@@ -2,7 +2,7 @@
 
 A simple example of a Kubernetes controller written in Golang.
 
-What it does is whenever a new Deployment is created in "default" namespace, it will expose the Deployment by creating a Service.
+What it does is whenever a new Deployment is created in "default" namespace, it will expose the Deployment by creating a Service and an Ingress.
 
 ![Kubernetes Controller Diagram](./docs/k8s-controller.drawio.svg)
 

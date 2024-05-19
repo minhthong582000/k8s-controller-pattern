@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/samber/lo"
 	corev1 "k8s.io/api/core/v1"
+	netv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	appinformers "k8s.io/client-go/informers/apps/v1"
@@ -93,7 +95,7 @@ func (c *Controller) processNextItem() bool {
 	err = c.exposeDeployment(ns, name)
 	if err != nil {
 		// TODO: Implement retry logic
-		fmt.Println("Error exposing deployment")
+		fmt.Println("Error exposing deployment", err)
 		return false
 	}
 
@@ -104,6 +106,7 @@ func (c *Controller) processNextItem() bool {
 //
 // What it does is whenever a new deployment is added,
 // it will create a service to expose the deployment
+// and an ingress to route the traffic.
 func (c *Controller) exposeDeployment(namespace, name string) error {
 	ctx := context.Background()
 
@@ -133,8 +136,45 @@ func (c *Controller) exposeDeployment(namespace, name string) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("Service with name %s created\n", svc.Name)
 
-	fmt.Printf("Service %s created\n", svc.Name)
+	// Create an ingress that routes traffic to the service
+	ingress := netv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      deployment.Name,
+			Namespace: deployment.Namespace,
+		},
+		Spec: netv1.IngressSpec{
+			Rules: []netv1.IngressRule{
+				{
+					IngressRuleValue: netv1.IngressRuleValue{
+						HTTP: &netv1.HTTPIngressRuleValue{
+							Paths: []netv1.HTTPIngressPath{
+								{
+									Path:     "/",
+									PathType: lo.ToPtr(netv1.PathTypePrefix),
+									Backend: netv1.IngressBackend{
+										Service: &netv1.IngressServiceBackend{
+											Name: svc.Name,
+											Port: netv1.ServiceBackendPort{
+												Name: svc.Spec.Ports[0].Name,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	_, err = c.ClientSet.NetworkingV1().Ingresses(namespace).Create(ctx, &ingress, metav1.CreateOptions{})
+	if err != nil {
+		return err
+	}
+	fmt.Println("Ingress with Name: ", ingress.Name, " created")
 
 	return nil
 }
