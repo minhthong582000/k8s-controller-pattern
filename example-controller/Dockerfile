@@ -33,4 +33,4 @@ WORKDIR /
 COPY --from=builder /usr/bin/example-controller /
 USER nonroot:nonroot
 
-CMD ["/example-controller"]
+ENTRYPOINT ["/example-controller"]
