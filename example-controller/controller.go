@@ -20,8 +20,27 @@ import (
 )
 
 type Controller struct {
-	ClientSet           kubernetes.Interface
-	DeploymentLister    applisters.DeploymentLister
+	// ClientSet is the kubernetes client
+	// Use when you want to know the current exact state of the resources
+	ClientSet kubernetes.Interface
+
+	// If you want to know the state of the resources in the most efficient way,
+	// use this lister.
+	//
+	// Objects read from listers can always be slightly out-of-date (i.e., stale)
+	// because the client has to first observe changes to API objects via watch events
+	// and then update the cache.
+	//
+	// Thus, don’t make any decisions based on data read from Listers
+	// if the consequences of deciding wrongfully based on stale state
+	// might be catastrophic (e.g. leaking infrastructure resources).
+	// In such cases, read directly from the API server via a client instead.
+	//
+	// Objects retrieved from Informers or Listers are pointers to the cached objects,
+	// so they must not be modified without copying them first.
+	DeploymentLister applisters.DeploymentLister
+
+	// Notifies the controller when the cache is synced
 	DeploymentCacheSync cache.InformerSynced
 
 	// Every time a new event detected by informer, it will be added to the queue
