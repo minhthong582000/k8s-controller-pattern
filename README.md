@@ -13,3 +13,5 @@ Includes:
 
 - A Kubernetes cluster with kubectl configured
 - Go 1.22 or later
+- [controller-gen](https://github.com/kubernetes-sigs/controller-tools/tree/master/cmd/controller-gen)
+- [code-generator](https://github.com/kubernetes/code-generator)
