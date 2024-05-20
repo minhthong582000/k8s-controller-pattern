@@ -38,6 +38,8 @@ type Controller struct {
 	//
 	// Objects retrieved from Informers or Listers are pointers to the cached objects,
 	// so they must not be modified without copying them first.
+	//
+	// Ref: https://medium.com/@timebertt/kubernetes-controllers-at-scale-clients-caches-conflicts-patches-explained-aa0f7a8b4332
 	DeploymentLister applisters.DeploymentLister
 
 	// Notifies the controller when the cache is synced
