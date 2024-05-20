@@ -7,6 +7,7 @@ Includes:
 1. [client-go](./client-go/)
 2. [api-machinery](./api-machinery/README.md)
 3. [example-controller](./example-controller/README.md)
+4. [gitops-controller](./gitops/README.md)
 
 ## Prerequisites
 

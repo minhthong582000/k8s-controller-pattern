@@ -1,0 +1,5 @@
+*.md
+docs/
+.git
+hack/
+deploy/
