@@ -8,6 +8,7 @@ import (
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/internal/controller"
 	appclient "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned"
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
+	"github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/signals"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -15,7 +16,6 @@ import (
 )
 
 func main() {
-
 	isInCluster := false
 
 	kubeconfig := flag.String("kubeconfig", "~/.kube/config", "Path to a kubeconfig. Only required if out-of-cluster.")
@@ -47,7 +47,7 @@ func main() {
 		panic(err)
 	}
 	appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
-	stopCh := make(chan struct{})
+	stopCh := signals.SetupSignalHandler()
 	ctrl := controller.NewController(
 		clientSet,
 		appClientSet,
