@@ -10,13 +10,19 @@ type Application struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec ApplicationSpec `json:"spec,omitempty"`
+	Spec   ApplicationSpec   `json:"spec,omitempty"`
+	Status ApplicationStatus `json:"status,omitempty"`
 }
 
 type ApplicationSpec struct {
 	Repository string `json:"repository,omitempty"`
 	Revision   string `json:"revision,omitempty"`
 	Path       string `json:"path,omitempty"`
+}
+
+type ApplicationStatus struct {
+	Status   string `json:"status,omitempty"`
+	Revision string `json:"revision,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

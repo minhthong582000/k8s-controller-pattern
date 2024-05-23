@@ -44,6 +44,13 @@ spec:
               revision:
                 type: string
             type: object
+          status:
+            properties:
+              revision:
+                type: string
+              status:
+                type: string
+            type: object
         type: object
     served: true
     storage: true
