@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	"k8s.io/klog"
 )
 
 type Controller struct {
@@ -67,8 +68,8 @@ func NewController(
 	return c
 }
 
-func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) {
-	fmt.Println("Starting controller")
+func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) error {
+	klog.Info("Starting controller")
 
 	defer func() {
 		c.queue.ShutDown()
@@ -76,7 +77,7 @@ func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) {
 
 	// Wait for the caches to be synced before starting workers
 	if !cache.WaitForCacheSync(stopCh, c.appCacheSync) {
-		fmt.Println("Error syncing cache")
+		return fmt.Errorf("timed out waiting for caches to sync")
 	}
 
 	for i := 0; i < numWorkers; i++ {
@@ -85,6 +86,8 @@ func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) {
 	}
 
 	<-stopCh
+
+	return nil
 }
 
 func (c *Controller) worker() {
@@ -141,8 +144,7 @@ func (c *Controller) processNextItem() bool {
 
 			// If there is another type of error, requeue the item
 			c.queue.AddRateLimited(obj)
-			fmt.Println("Error getting deployment info", err)
-			return err
+			return fmt.Errorf("error getting deployment info: %s", err)
 		}
 
 		err = c.createResources(app)
@@ -173,20 +175,20 @@ func (c *Controller) createResources(app *v1alpha1.Application) error {
 		return fmt.Errorf("error updating application status to Processing: %s", err)
 	}
 
-	fmt.Println("Creating resources for application", app.Name)
+	klog.Infof("Creating resources for application %s", app.Name)
 
 	// Clone the repository
-	fmt.Println("Cloning repository to", repoPath)
+	klog.Infof("Cloning repository to %s", repoPath)
 	err = c.gitClient.CloneOrFetch(app.Spec.Repository, repoPath)
 	if err != nil {
 		return fmt.Errorf("error cloning repository: %s", err)
 	}
-	fmt.Println("Checking out revision")
+	klog.Infof("Repository cloned to %s", repoPath)
 	err = c.gitClient.Checkout(repoPath, app.Spec.Revision)
 	if err != nil {
 		return fmt.Errorf("error checking out revision: %s", err)
 	}
-	fmt.Println("Repository cloned and revision checked out")
+	klog.Infof("Checked out revision %s", app.Spec.Revision)
 
 	// Generate manifests
 	app, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(context.Background(), app.Name, metav1.GetOptions{})
@@ -205,7 +207,7 @@ func (c *Controller) createResources(app *v1alpha1.Application) error {
 func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 	repoPath := path.Join(os.TempDir(), strings.Replace(app.Spec.Repository, "/", "_", -1))
 
-	fmt.Println("Cleaning up files in", repoPath)
+	klog.Infof("Deleting resources for application %s", app.Name)
 	err := c.gitClient.CleanUp(repoPath)
 	if err != nil {
 		return fmt.Errorf("error cleaning up repository: %s", err)
@@ -215,14 +217,14 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 }
 
 func (c *Controller) handleAdd(obj interface{}) {
-	fmt.Println("New application added")
+	klog.Info("Application added")
 
 	// Add the object to the queue
 	c.queue.AddRateLimited(obj)
 }
 
 func (c *Controller) handleDelete(obj interface{}) {
-	fmt.Println("Application deleted")
+	klog.Info("Application deleted")
 
 	// Delete the object from the queue
 	c.queue.AddRateLimited(obj)

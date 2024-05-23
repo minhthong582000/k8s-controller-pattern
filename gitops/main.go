@@ -13,6 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/klog/v2"
 )
 
 func main() {
@@ -55,5 +56,8 @@ func main() {
 		gitClient,
 	)
 	appInformerFactory.Start(stopCh)
-	ctrl.Run(1, stopCh)
+	if err = ctrl.Run(2, stopCh); err != nil {
+		klog.Fatalf("Error running controller: %s", err.Error())
+		return
+	}
 }

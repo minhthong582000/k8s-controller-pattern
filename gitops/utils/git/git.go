@@ -43,9 +43,8 @@ func (g *gitClient) CloneOrFetch(url, path string) error {
 		}
 
 		_, err := git.PlainClone(path, false, &git.CloneOptions{
-			Auth:     authOption,
-			URL:      url,
-			Progress: os.Stdout,
+			Auth: authOption,
+			URL:  url,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to clone repository: %w", err)
