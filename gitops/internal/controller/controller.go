@@ -252,6 +252,9 @@ func (c *Controller) handleUdate(old, new interface{}) {
 	// _ = newApp.DeepCopy()
 }
 
+// updateAppStatus to safely update the status of an application.
+// We need this instead of using UpdateStatus() since the obj can
+// be updated between the time we get and do the status modification.
 func (c *Controller) updateAppStatus(ctx context.Context, app *v1alpha1.Application, status *v1alpha1.ApplicationStatus) error {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		pod, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
