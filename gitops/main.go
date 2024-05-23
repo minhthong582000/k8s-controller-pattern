@@ -1,13 +1,15 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"time"
 
+	"github.com/minhthong582000/k8s-controller-pattern/gitops/internal/controller"
 	appclient "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
+	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -34,22 +36,24 @@ func main() {
 		}
 	}
 	config.Timeout = 120 * time.Second
-	clientSet, err := appclient.NewForConfig(config)
+
+	gitClient := git.NewGitClient("")
+	appClientSet, err := appclient.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
-
-	apps, err := clientSet.ThongdepzaiV1alpha1().Applications("").List(context.Background(), metav1.ListOptions{})
+	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)
 	}
-
-	if len(apps.Items) == 0 {
-		fmt.Println("No applications found")
-		return
-	}
-
-	for _, app := range apps.Items {
-		fmt.Printf("Found application %s\n", app.Name)
-	}
+	appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
+	stopCh := make(chan struct{})
+	ctrl := controller.NewController(
+		clientSet,
+		appClientSet,
+		appInformerFactory.Thongdepzai().V1alpha1().Applications(),
+		gitClient,
+	)
+	appInformerFactory.Start(stopCh)
+	ctrl.Run(1, stopCh)
 }

@@ -40,6 +40,7 @@ type ApplicationsGetter interface {
 type ApplicationInterface interface {
 	Create(ctx context.Context, application *v1alpha1.Application, opts v1.CreateOptions) (*v1alpha1.Application, error)
 	Update(ctx context.Context, application *v1alpha1.Application, opts v1.UpdateOptions) (*v1alpha1.Application, error)
+	UpdateStatus(ctx context.Context, application *v1alpha1.Application, opts v1.UpdateOptions) (*v1alpha1.Application, error)
 	Delete(ctx context.Context, name string, opts v1.DeleteOptions) error
 	DeleteCollection(ctx context.Context, opts v1.DeleteOptions, listOpts v1.ListOptions) error
 	Get(ctx context.Context, name string, opts v1.GetOptions) (*v1alpha1.Application, error)
@@ -128,6 +129,22 @@ func (c *applications) Update(ctx context.Context, application *v1alpha1.Applica
 		Namespace(c.ns).
 		Resource("applications").
 		Name(application.Name).
+		VersionedParams(&opts, scheme.ParameterCodec).
+		Body(application).
+		Do(ctx).
+		Into(result)
+	return
+}
+
+// UpdateStatus was generated because the type contains a Status member.
+// Add a +genclient:noStatus comment above the type to avoid generating UpdateStatus().
+func (c *applications) UpdateStatus(ctx context.Context, application *v1alpha1.Application, opts v1.UpdateOptions) (result *v1alpha1.Application, err error) {
+	result = &v1alpha1.Application{}
+	err = c.client.Put().
+		Namespace(c.ns).
+		Resource("applications").
+		Name(application.Name).
+		SubResource("status").
 		VersionedParams(&opts, scheme.ParameterCodec).
 		Body(application).
 		Do(ctx).
