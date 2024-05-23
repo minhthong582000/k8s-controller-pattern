@@ -211,6 +211,10 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 }
 
 func (c *Controller) deleteResources(app *v1alpha1.Application) error {
+	if app.Name == "" {
+		return fmt.Errorf("application name is empty")
+	}
+
 	repoPath := path.Join(os.TempDir(), strings.Replace(app.Spec.Repository, "/", "_", -1))
 
 	klog.Infof("Deleting resources for application %s", app.Name)
