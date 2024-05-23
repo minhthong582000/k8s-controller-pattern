@@ -19,6 +19,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
 )
@@ -105,9 +106,6 @@ func (c *Controller) processNextItem() bool {
 
 	// We wrap this block in a func so we can defer c.workqueue.Done.
 	err := func(obj interface{}) error {
-		app := obj.(*v1alpha1.Application)
-		app = app.DeepCopy()
-
 		defer c.queue.Done(item)
 
 		// Extract the key from the item in namespace/name format
@@ -129,9 +127,10 @@ func (c *Controller) processNextItem() bool {
 		// Since we only know about the deployment object,
 		// We have to check with the API server to determine
 		// if the deployment is added or deleted.
-		_, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(ns).Get(ctx, name, metav1.GetOptions{})
+		app, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(ns).Get(ctx, name, metav1.GetOptions{})
 		if err != nil {
 			if apierrors.IsNotFound(err) {
+				app = obj.(*v1alpha1.Application)
 				err = c.deleteResources(app)
 				if err != nil {
 					c.queue.AddRateLimited(obj)
@@ -147,7 +146,7 @@ func (c *Controller) processNextItem() bool {
 			return fmt.Errorf("error getting deployment info: %s", err)
 		}
 
-		err = c.createResources(app)
+		err = c.createResources(ctx, app)
 		if err != nil {
 			c.queue.AddRateLimited(obj)
 			return fmt.Errorf("error creating resources: %s", err)
@@ -165,12 +164,16 @@ func (c *Controller) processNextItem() bool {
 	return true
 }
 
-func (c *Controller) createResources(app *v1alpha1.Application) error {
+func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Application) error {
 	repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
 
-	app.Status.Status = "Processing"
-	app.Status.Revision = app.Spec.Revision
-	_, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+	err := c.updateAppStatus(
+		ctx,
+		app,
+		&v1alpha1.ApplicationStatus{
+			Status: "Processing",
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("error updating application status to Processing: %s", err)
 	}
@@ -184,19 +187,22 @@ func (c *Controller) createResources(app *v1alpha1.Application) error {
 		return fmt.Errorf("error cloning repository: %s", err)
 	}
 	klog.Infof("Repository cloned to %s", repoPath)
-	err = c.gitClient.Checkout(repoPath, app.Spec.Revision)
+	sha, err := c.gitClient.Checkout(repoPath, app.Spec.Revision)
 	if err != nil {
 		return fmt.Errorf("error checking out revision: %s", err)
 	}
 	klog.Infof("Checked out revision %s", app.Spec.Revision)
 
 	// Generate manifests
-	app, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(context.Background(), app.Name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("error getting application: %s", err)
-	}
-	app.Status.Status = "Ready"
-	_, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Update(context.Background(), app, metav1.UpdateOptions{})
+
+	err = c.updateAppStatus(
+		ctx,
+		app,
+		&v1alpha1.ApplicationStatus{
+			Status:   "Ready",
+			Revision: sha,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("error updating application status to Ready: %s", err)
 	}
@@ -240,4 +246,26 @@ func (c *Controller) handleUdate(old, new interface{}) {
 	// }
 
 	// _ = newApp.DeepCopy()
+}
+
+func (c *Controller) updateAppStatus(ctx context.Context, app *v1alpha1.Application, status *v1alpha1.ApplicationStatus) error {
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		pod, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+
+		pod.Status = *status
+		_, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+		if err == nil {
+			return nil
+		}
+
+		return err
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

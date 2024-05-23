@@ -11,7 +11,7 @@ import (
 
 type GitClient interface {
 	CloneOrFetch(url, path string) error
-	Checkout(path, revision string) error
+	Checkout(path, revision string) (string, error)
 	CleanUp(path string) error
 }
 
@@ -58,37 +58,50 @@ func (g *gitClient) CloneOrFetch(url, path string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open repository: %w", err)
 	}
-	err = r.Fetch(&git.FetchOptions{})
-	if err != nil {
-		if err == git.NoErrAlreadyUpToDate {
-			return nil
-		}
-
+	err = r.Fetch(&git.FetchOptions{
+		Force: true,
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to fetch repository: %w", err)
 	}
 
 	return nil
 }
 
-func (g *gitClient) Checkout(path, revision string) error {
+func (g *gitClient) Checkout(path, revision string) (string, error) {
 	r, err := git.PlainOpen(path)
 	if err != nil {
-		return fmt.Errorf("failed to open repository: %w", err)
+		return "", fmt.Errorf("failed to open repository: %w", err)
 	}
 
 	w, err := r.Worktree()
 	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
+		return "", fmt.Errorf("failed to get worktree: %w", err)
 	}
 
 	err = w.Checkout(&git.CheckoutOptions{
 		Branch: plumbing.ReferenceName(plumbing.NewBranchReferenceName(revision)),
+		Force:  true,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to checkout revision: %w", err)
+		return "", fmt.Errorf("failed to checkout revision: %w", err)
 	}
 
-	return nil
+	// Git pull
+	err = w.Pull(&git.PullOptions{
+		Force: true,
+	})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return "", fmt.Errorf("failed to pull: %w", err)
+	}
+
+	// Find current HEAD
+	ref, err := r.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	return ref.Hash().String(), nil
 }
 
 func (g *gitClient) CleanUp(path string) error {
