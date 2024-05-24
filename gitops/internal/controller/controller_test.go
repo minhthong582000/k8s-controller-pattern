@@ -13,6 +13,7 @@ import (
 	appclientset "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned/fake"
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
+	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/k8s"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,6 +35,7 @@ func newFakeController(apps ...runtime.Object) *Controller {
 	kubeClientSet := fake.NewSimpleClientset()
 	appClientSet := appclientset.NewSimpleClientset(apps...)
 	gitClient := git.NewGitClient("")
+	k8sUtil := k8sutil.NewK8s()
 	appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
 
 	return NewController(
@@ -41,6 +43,7 @@ func newFakeController(apps ...runtime.Object) *Controller {
 		appClientSet,
 		appInformerFactory.Thongdepzai().V1alpha1().Applications(),
 		gitClient,
+		k8sUtil,
 	)
 }
 

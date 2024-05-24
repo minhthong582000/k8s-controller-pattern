@@ -10,6 +10,7 @@ import (
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/signals"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
+	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/k8s"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -39,6 +40,7 @@ func main() {
 	config.Timeout = 120 * time.Second
 
 	gitClient := git.NewGitClient("")
+	k8sutil := k8sutil.NewK8s()
 	appClientSet, err := appclient.NewForConfig(config)
 	if err != nil {
 		panic(err)
@@ -54,6 +56,7 @@ func main() {
 		appClientSet,
 		appInformerFactory.Thongdepzai().V1alpha1().Applications(),
 		gitClient,
+		k8sutil,
 	)
 	appInformerFactory.Start(stopCh)
 	if err = ctrl.Run(2, stopCh); err != nil {
