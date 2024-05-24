@@ -16,7 +16,7 @@ jobs:
   get-changed-dirs:
     runs-on: ubuntu-latest
     outputs:
-      dirs: steps.get-changed-dirs.changed_files.all_changed_and_modified_files
+      dirs: ${{ steps.get-changed-dirs.outputs.all_changed_and_modified_files }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
