@@ -11,29 +11,29 @@ import (
 
 var (
 	testCases = []struct {
-		name      string
-		gitClient *gitClient
-		url       string
-		want      string
-		err       string
+		name        string
+		gitClient   *gitClient
+		url         string
+		expectedOut string
+		expectedErr string
 	}{
 		{
 			name: "Clone repository",
 			gitClient: &gitClient{
 				token: "",
 			},
-			url:  "https://github.com/minhthong582000/k8s-controller-pattern.git",
-			want: "",
-			err:  "",
+			url:         "https://github.com/minhthong582000/k8s-controller-pattern.git",
+			expectedOut: "",
+			expectedErr: "",
 		},
 		{
 			name: "Clone unexisted repository",
 			gitClient: &gitClient{
 				token: "",
 			},
-			url:  "https://github.com/minhthong582000/unexisted-repository.git",
-			want: "",
-			err:  "failed to clone repository: authentication required",
+			url:         "https://github.com/minhthong582000/unexisted-repository.git",
+			expectedOut: "",
+			expectedErr: "failed to clone repository: authentication required",
 		},
 	}
 )
@@ -48,22 +48,22 @@ func TestGitClient_CloneOrFetch_CleanUp(t *testing.T) {
 			}
 			err := g.CloneOrFetch(tt.url, path)
 			if err != nil {
-				if tt.err != err.Error() {
-					assert.Equal(t, tt.err, err)
+				if tt.expectedErr != "" {
+					assert.Equal(t, tt.expectedErr, err.Error())
 				}
 			}
 
 			// Call CloneOrFetch again to see if it fetches the latest changes
 			err = g.CloneOrFetch(tt.url, path)
 			if err != nil {
-				if tt.err != err.Error() {
-					assert.Equal(t, tt.err, err)
+				if tt.expectedErr != err.Error() {
+					assert.Equal(t, tt.expectedErr, err.Error())
 				}
 			}
 
 			// Clean up
 			err = g.CleanUp(path)
-			assert.Nil(t, err)
+			assert.NoError(t, err)
 		})
 	}
 }

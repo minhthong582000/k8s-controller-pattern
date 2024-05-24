@@ -99,20 +99,20 @@ func (c *Controller) worker() {
 func (c *Controller) processNextItem() bool {
 	ctx := context.Background()
 
-	item, shutdown := c.queue.Get()
+	obj, shutdown := c.queue.Get()
 	if shutdown {
 		return false
 	}
 
 	// We wrap this block in a func so we can defer c.workqueue.Done.
 	err := func(obj interface{}) error {
-		defer c.queue.Done(item)
+		defer c.queue.Done(obj)
 
 		// Extract the key from the item in namespace/name format
-		key, err := cache.MetaNamespaceKeyFunc(item)
+		key, err := cache.MetaNamespaceKeyFunc(obj)
 		if err != nil {
 			// Since we can't process the item, we stop processing it
-			c.queue.Forget(item)
+			c.queue.Forget(obj)
 			return fmt.Errorf("error getting key from item: %s", err)
 		}
 
@@ -120,7 +120,7 @@ func (c *Controller) processNextItem() bool {
 		ns, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			// Since we can't process the item, we stop processing it
-			c.queue.Forget(item)
+			c.queue.Forget(obj)
 			return fmt.Errorf("error splitting key: %s", err)
 		}
 
@@ -137,7 +137,7 @@ func (c *Controller) processNextItem() bool {
 					return fmt.Errorf("error cleaning up resources: %s", err)
 				}
 
-				c.queue.Forget(item)
+				c.queue.Forget(obj)
 				return nil
 			}
 
@@ -152,13 +152,16 @@ func (c *Controller) processNextItem() bool {
 			return fmt.Errorf("error creating resources: %s", err)
 		}
 
-		c.queue.Forget(item)
+		c.queue.Forget(obj)
 
 		return nil
-	}(item)
+	}(obj)
 
 	if err != nil {
 		utilruntime.HandleError(err)
+		c.updateAppStatus(ctx, obj.(*v1alpha1.Application), &v1alpha1.ApplicationStatus{
+			Status: "Failed",
+		})
 	}
 
 	return true
@@ -215,7 +218,7 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 		return fmt.Errorf("application name is empty")
 	}
 
-	repoPath := path.Join(os.TempDir(), strings.Replace(app.Spec.Repository, "/", "_", -1))
+	repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
 
 	klog.Infof("Deleting resources for application %s", app.Name)
 	err := c.gitClient.CleanUp(repoPath)
@@ -258,13 +261,13 @@ func (c *Controller) handleUdate(old, new interface{}) {
 // be updated between the time we get and do the status modification.
 func (c *Controller) updateAppStatus(ctx context.Context, app *v1alpha1.Application, status *v1alpha1.ApplicationStatus) error {
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		pod, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
+		queryApp, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
 		if err != nil {
 			return err
 		}
 
-		pod.Status = *status
-		_, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).UpdateStatus(ctx, pod, metav1.UpdateOptions{})
+		queryApp.Status = *status
+		_, err = c.appClientSet.ThongdepzaiV1alpha1().Applications(queryApp.Namespace).UpdateStatus(ctx, queryApp, metav1.UpdateOptions{})
 		if err == nil {
 			return nil
 		}
