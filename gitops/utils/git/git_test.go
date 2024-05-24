@@ -48,17 +48,13 @@ func TestGitClient_CloneOrFetch_CleanUp(t *testing.T) {
 			}
 			err := g.CloneOrFetch(tt.url, path)
 			if err != nil {
-				if tt.expectedErr != "" {
-					assert.Equal(t, tt.expectedErr, err.Error())
-				}
+				assert.Equal(t, tt.expectedErr, err.Error())
 			}
 
 			// Call CloneOrFetch again to see if it fetches the latest changes
 			err = g.CloneOrFetch(tt.url, path)
 			if err != nil {
-				if tt.expectedErr != err.Error() {
-					assert.Equal(t, tt.expectedErr, err.Error())
-				}
+				assert.Equal(t, tt.expectedErr, err.Error())
 			}
 
 			// Clean up
