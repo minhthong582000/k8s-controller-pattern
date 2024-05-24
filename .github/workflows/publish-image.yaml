@@ -26,6 +26,7 @@ jobs:
         id: get-changed-dirs
         with:
           dir_names: "true"
+          matrix: "true"
           files: |
             example-controller/**/*
             gitops/**/*
