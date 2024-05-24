@@ -1,0 +1,70 @@
+name: Build & publish images
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  REGISTRY_PATH: ${{ github.repository }}
+
+jobs:
+  get-changed-dirs:
+    runs-on: ubuntu-latest
+    outputs:
+      dirs: steps.get-changed-dirs.changed_files.all_changed_and_modified_files
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Get changed dirs
+        uses: tj-actions/changed-files@v44
+        id: get-changed-dirs
+        with:
+          dir_names: "true"
+          files: |
+            example-controller/**/*
+            gitops/**/*
+            !**/*.md
+
+      - name: Echo changed dirs
+        run: echo "${{ steps.get-changed-dirs.outputs.all_changed_and_modified_files }}"
+
+  # build-and-push-image:
+  #   runs-on: ubuntu-latest
+  #   needs:
+  #     - get-changed-dirs
+  #   strategy:
+  #     fail-fast: false
+  #     matrix: ${{ fromJson(needs.get-changed-dirs.outputs.dirs) }}
+  #   permissions:
+  #     contents: read
+  #     packages: write
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v3
+
+  #     - name: Log in to the Container registry
+  #       uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+  #       with:
+  #         registry: ${{ env.REGISTRY }}
+  #         username: ${{ github.actor }}
+  #         password: ${{ secrets.GITHUB_TOKEN }}
+
+  #     - name: Read VERSION file
+  #       id: version
+  #       run: |
+  #         version=$(cat ${{ matrix.dirs }}/VERSION)
+  #         echo "version=$version" >> $GITHUB_OUTPUT
+
+  #     - name: Build and push Docker image
+  #       uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
+  #       with:
+  #         context: ${{ matrix.dirs }}
+  #         file: ${{ matrix.dirs }}/Dockerfile
+  #         push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+  #         tags: ${{ env.REGISTRY_PATH }}/${{ matrix.dirs }}:${{ steps.version.outputs.version }}
