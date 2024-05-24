@@ -8,18 +8,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/minhthong582000/k8s-controller-pattern/gitops/common"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/apis/application/v1alpha1"
 	appclientset "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned"
+	"github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned/scheme"
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions/application/v1alpha1"
 	applisters "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/listers/application/v1alpha1"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	typedcorev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -39,6 +44,8 @@ type Controller struct {
 	queue workqueue.RateLimitingInterface
 
 	gitClient git.GitClient
+
+	eventRecorder record.EventRecorder
 }
 
 func NewController(
@@ -47,6 +54,12 @@ func NewController(
 	informer appinformers.ApplicationInformer,
 	gitClient git.GitClient,
 ) *Controller {
+	klog.V(4).Info("Creating event broadcaster")
+	eventBroadcaster := record.NewBroadcaster()
+	eventBroadcaster.StartLogging(klog.V(4).Infof)
+	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
+	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: common.ControllerName})
+
 	c := &Controller{
 		clientSet:    clientSet,
 		appClientSet: appClientSet,
@@ -56,7 +69,8 @@ func NewController(
 			workqueue.DefaultControllerRateLimiter(),
 			"application",
 		),
-		gitClient: gitClient,
+		gitClient:     gitClient,
+		eventRecorder: recorder,
 	}
 
 	informer.Informer().AddEventHandler(
@@ -210,6 +224,8 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 	if err != nil {
 		return fmt.Errorf("error updating application status to Ready: %s", err)
 	}
+
+	c.eventRecorder.Event(app, corev1.EventTypeNormal, common.SuccessSynced, common.MessageResourceSynced)
 
 	return nil
 }
