@@ -46,6 +46,9 @@ spec:
             type: object
           status:
             properties:
+              lastSyncAt:
+                format: date-time
+                type: string
               revision:
                 type: string
               status:

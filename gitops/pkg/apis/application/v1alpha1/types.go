@@ -22,8 +22,9 @@ type ApplicationSpec struct {
 }
 
 type ApplicationStatus struct {
-	Status   string `json:"status,omitempty"`
-	Revision string `json:"revision,omitempty"`
+	Status     string      `json:"status,omitempty"`
+	Revision   string      `json:"revision,omitempty"`
+	LastSyncAt metav1.Time `json:"lastSyncAt,omitempty"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object

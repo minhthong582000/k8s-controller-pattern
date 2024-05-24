@@ -13,6 +13,7 @@ import (
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions/application/v1alpha1"
 	applisters "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/listers/application/v1alpha1"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -233,27 +234,32 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 func (c *Controller) handleAdd(obj interface{}) {
 	klog.Info("Application added")
 
-	// Add the object to the queue
 	c.queue.AddRateLimited(obj)
 }
 
 func (c *Controller) handleDelete(obj interface{}) {
 	klog.Info("Application deleted")
 
-	// Delete the object from the queue
 	c.queue.AddRateLimited(obj)
 }
 
 func (c *Controller) handleUdate(old, new interface{}) {
-	// fmt.Println("Application updated")
+	klog.Info("Application updated")
 
-	// newApp, ok := new.(*v1alpha1.Application)
-	// if !ok {
-	// 	fmt.Println("Error decoding object")
-	// 	return
-	// }
+	oldApp, oldOk := old.(*v1alpha1.Application)
+	newApp, newOk := new.(*v1alpha1.Application)
+	if !oldOk || !newOk {
+		klog.Error("Error decoding object, invalid type")
+		return
+	}
 
-	// _ = newApp.DeepCopy()
+	// Compare old and new spec
+	if equality.Semantic.DeepEqual(oldApp.Spec, newApp.Spec) {
+		klog.Info("No changes in spec, skipping")
+		return
+	}
+
+	c.queue.AddRateLimited(new)
 }
 
 // updateAppStatus to safely update the status of an application.
