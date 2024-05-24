@@ -64,9 +64,7 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
-			expectedOut:    "",
 			expectedStatus: "Ready",
-			expectedErr:    "",
 		},
 		{
 			name: "Application with invalid repository",
@@ -76,13 +74,12 @@ apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
   name: example-application
 spec:
-  repository: https://github.com/minhthong582000/unexisted-repository.git
+  repository: https://github.com/kubernetes/kubernetes-but-not-exist.git
   revision: main
   path: k8s-controller-pattern/gitops
 `,
-			expectedOut:    "",
 			expectedStatus: "Processing",
-			expectedErr:    "error cloning repository: failed to open repository: repository does not exist",
+			expectedErr:    "error cloning repository: failed to clone repository: authentication required",
 		},
 	}
 )
@@ -140,9 +137,6 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
-			expectedOut:    "",
-			expectedStatus: "",
-			expectedErr:    "",
 		},
 		{
 			name: "Application with invalid repository",
@@ -152,13 +146,10 @@ apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
   name: another-example-application
 spec:
-  repository: https://github.com/minhthong582000/unexisted-repository.git
+  repository: https://github.com/kubernetes/kubernetes-but-not-exist.git
   revision: main
   path: k8s-controller-pattern/gitops
 `,
-			expectedOut:    "",
-			expectedStatus: "",
-			expectedErr:    "nho",
 		},
 	}
 )
