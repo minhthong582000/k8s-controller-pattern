@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	appv1 "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/apis/application/v1alpha1"
+	"github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/apis/application/v1alpha1"
 	appclientset "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned/fake"
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
@@ -20,8 +20,8 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 )
 
-func newFakeApp(appString string) *appv1.Application {
-	var app appv1.Application
+func newFakeApp(appString string) *v1alpha1.Application {
+	var app v1alpha1.Application
 	dec := k8syaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(appString)), 1000)
 	if err := dec.Decode(&app); err != nil {
 		return nil
@@ -49,7 +49,7 @@ var (
 		name           string
 		app            string
 		expectedOut    string
-		expectedStatus string
+		expectedStatus v1alpha1.HealthStatusCode
 		expectedErr    string
 	}{
 		{
@@ -64,7 +64,7 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
-			expectedStatus: "Ready",
+			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusHealthy),
 		},
 		{
 			name: "Application with invalid repository",
@@ -78,7 +78,7 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
-			expectedStatus: "Processing",
+			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusProgressing),
 			expectedErr:    "error cloning repository: failed to clone repository: authentication required",
 		},
 	}
@@ -112,7 +112,7 @@ func Test_CreateResources(t *testing.T) {
 			// Check the status of the application
 			queryApp, err := controller.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
 			assert.NoError(t, err)
-			assert.Equal(t, tt.expectedStatus, queryApp.Status.Status)
+			assert.Equal(t, tt.expectedStatus, queryApp.Status.HealthStatus)
 		})
 	}
 }

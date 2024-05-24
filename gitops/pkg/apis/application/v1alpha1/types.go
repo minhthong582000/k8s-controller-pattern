@@ -22,10 +22,18 @@ type ApplicationSpec struct {
 }
 
 type ApplicationStatus struct {
-	Status     string      `json:"status,omitempty"`
-	Revision   string      `json:"revision,omitempty"`
-	LastSyncAt metav1.Time `json:"lastSyncAt,omitempty"`
+	HealthStatus HealthStatusCode `json:"healthStatus,omitempty"`
+	Revision     string           `json:"revision,omitempty"`
+	LastSyncAt   metav1.Time      `json:"lastSyncAt,omitempty"`
 }
+
+type HealthStatusCode string
+
+const (
+	HealthStatusProgressing = "Progressing"
+	HealthStatusHealthy     = "Healthy"
+	HealthStatusDegraded    = "Degraded"
+)
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type ApplicationList struct {

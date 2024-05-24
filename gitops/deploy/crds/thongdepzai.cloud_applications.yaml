@@ -46,12 +46,12 @@ spec:
             type: object
           status:
             properties:
+              healthStatus:
+                type: string
               lastSyncAt:
                 format: date-time
                 type: string
               revision:
-                type: string
-              status:
                 type: string
             type: object
         type: object

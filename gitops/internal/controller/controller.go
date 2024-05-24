@@ -175,7 +175,7 @@ func (c *Controller) processNextItem() bool {
 	if err != nil {
 		utilruntime.HandleError(err)
 		c.updateAppStatus(ctx, obj.(*v1alpha1.Application), &v1alpha1.ApplicationStatus{
-			Status: "Failed",
+			HealthStatus: v1alpha1.HealthStatusDegraded,
 		})
 	}
 
@@ -189,7 +189,7 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		ctx,
 		app,
 		&v1alpha1.ApplicationStatus{
-			Status: "Processing",
+			HealthStatus: v1alpha1.HealthStatusProgressing,
 		},
 	)
 	if err != nil {
@@ -217,8 +217,8 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		ctx,
 		app,
 		&v1alpha1.ApplicationStatus{
-			Status:   "Ready",
-			Revision: sha,
+			HealthStatus: v1alpha1.HealthStatusHealthy,
+			Revision:     sha,
 		},
 	)
 	if err != nil {
