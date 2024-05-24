@@ -222,6 +222,7 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 	if err != nil {
 		return fmt.Errorf("error cleaning up repository: %s", err)
 	}
+	klog.Info("Resources cleaned up")
 
 	return nil
 }
