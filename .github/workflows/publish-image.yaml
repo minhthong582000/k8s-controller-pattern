@@ -70,4 +70,4 @@ jobs:
           context: ${{ matrix.dirs }}
           file: ${{ matrix.dirs }}/Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: ${{ env.REGISTRY_PATH }}/${{ matrix.dirs }}:${{ steps.version.outputs.version }}
+          tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_PATH }}/${{ matrix.dirs }}:${{ steps.version.outputs.version }}
