@@ -49,6 +49,7 @@ jobs:
       contents: read
       packages: write
       attestations: write
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
@@ -74,6 +75,8 @@ jobs:
           file: ${{ matrix.dirs }}/Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_PATH }}/${{ matrix.dirs }}:${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@v1
