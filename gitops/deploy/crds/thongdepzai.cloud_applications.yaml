@@ -14,7 +14,14 @@ spec:
     singular: application
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.healthStatus
+      name: HealthStatus
+      type: string
+    - jsonPath: .status.lastSyncAt
+      name: LastSync
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         properties:

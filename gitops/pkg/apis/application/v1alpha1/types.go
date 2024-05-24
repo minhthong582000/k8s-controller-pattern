@@ -7,6 +7,8 @@ import (
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="HealthStatus",type=string,JSONPath=`.status.healthStatus`
+// +kubebuilder:printcolumn:name="LastSync",type=string,JSONPath=`.status.lastSyncAt`
 type Application struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

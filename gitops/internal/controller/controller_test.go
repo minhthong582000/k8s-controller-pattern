@@ -116,6 +116,9 @@ func Test_CreateResources(t *testing.T) {
 			queryApp, err := controller.appClientSet.ThongdepzaiV1alpha1().Applications(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
 			assert.NoError(t, err)
 			assert.Equal(t, tt.expectedStatus, queryApp.Status.HealthStatus)
+
+			// Check the last sync time
+			assert.NotNil(t, queryApp.Status.LastSyncAt)
 		})
 	}
 }

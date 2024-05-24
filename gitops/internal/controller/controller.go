@@ -251,6 +251,7 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		&v1alpha1.ApplicationStatus{
 			HealthStatus: v1alpha1.HealthStatusHealthy,
 			Revision:     sha,
+			LastSyncAt:   metav1.Now(),
 		},
 	)
 	if err != nil {
