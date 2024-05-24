@@ -67,8 +67,18 @@ jobs:
 
       - name: Build and push Docker image
         uses: docker/build-push-action@2cdde995de11925a030ce8070c3d77a52ffcf1c0 # v5.3.0
+        id: push
         with:
           context: ${{ matrix.dirs }}
           file: ${{ matrix.dirs }}/Dockerfile
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: ${{ env.REGISTRY }}/${{ env.REGISTRY_PATH }}/${{ matrix.dirs }}:${{ steps.version.outputs.version }}
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: attest
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.REGISTRY_PATH }}/${{ matrix.dirs }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
