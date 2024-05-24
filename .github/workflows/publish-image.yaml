@@ -42,7 +42,8 @@ jobs:
       - get-changed-dirs
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.get-changed-dirs.outputs.dirs) }}
+      matrix:
+        dirs: ${{ fromJson(needs.get-changed-dirs.outputs.dirs) }}
     permissions:
       contents: read
       packages: write
