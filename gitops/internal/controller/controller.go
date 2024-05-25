@@ -16,6 +16,7 @@ import (
 	applisters "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/listers/application/v1alpha1"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
 	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/k8s"
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/retry"
 	"k8s.io/client-go/util/workqueue"
-	"k8s.io/klog"
 )
 
 type Controller struct {
@@ -58,9 +58,9 @@ func NewController(
 	gitUtil git.GitClient,
 	k8sUtil k8sutil.K8s,
 ) *Controller {
-	klog.V(4).Info("Creating event broadcaster")
+	log.Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
-	eventBroadcaster.StartLogging(klog.V(4).Infof)
+	eventBroadcaster.StartLogging(log.Debugf)
 	eventBroadcaster.StartRecordingToSink(&typedcorev1.EventSinkImpl{Interface: clientSet.CoreV1().Events("")})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, corev1.EventSource{Component: common.ControllerName})
 
@@ -90,9 +90,10 @@ func NewController(
 }
 
 func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) error {
-	klog.Info("Starting controller")
+	log.Info("Starting controller")
 
 	defer func() {
+		log.Debugf("Shutting down controller")
 		c.queue.ShutDown()
 	}()
 
@@ -201,20 +202,20 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		return fmt.Errorf("error updating application status to Processing: %s", err)
 	}
 
-	klog.Infof("Creating resources for application %s", app.Name)
+	log.WithField("application", app.Name).Info("Creating resources")
 
 	// Clone the repository
-	klog.Infof("Cloning repository to %s", repoPath)
+	log.Debugf("Cloning repository to %s", repoPath)
 	err = c.gitUtil.CloneOrFetch(app.Spec.Repository, repoPath)
 	if err != nil {
 		return fmt.Errorf("error cloning repository: %s", err)
 	}
-	klog.Infof("Repository cloned to %s", repoPath)
+	log.Debugf("Repository cloned to %s", repoPath)
 	sha, err := c.gitUtil.Checkout(repoPath, app.Spec.Revision)
 	if err != nil {
 		return fmt.Errorf("error checking out revision: %s", err)
 	}
-	klog.Infof("Checked out revision %s", app.Spec.Revision)
+	log.Debugf("Checked out revision %s", app.Spec.Revision)
 
 	// Generate manifests
 	oldResources, err := c.k8sUtil.GenerateManifests(path.Join(repoPath, app.Spec.Path))
@@ -235,7 +236,7 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		return fmt.Errorf("error diffing resources: %s", err)
 	}
 	if !diff {
-		klog.Info("No changes in resources, skipping")
+		log.Info("No changes in resources, skipping")
 		return nil
 	}
 
@@ -260,6 +261,8 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 
 	c.eventRecorder.Event(app, corev1.EventTypeNormal, common.SuccessSynced, common.MessageResourceSynced)
 
+	log.WithField("application", app.Name).Info("Resources created")
+
 	return nil
 }
 
@@ -270,41 +273,41 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 
 	repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
 
-	klog.Infof("Deleting resources for application %s", app.Name)
+	log.WithField("application", app.Name).Info("Deleting resources")
 	err := c.gitUtil.CleanUp(repoPath)
 	if err != nil {
 		return fmt.Errorf("error cleaning up repository: %s", err)
 	}
-	klog.Info("Resources cleaned up")
+	log.WithField("application", app.Name).Info("Resources deleted")
 
 	return nil
 }
 
 func (c *Controller) handleAdd(obj interface{}) {
-	klog.Info("Application added")
+	log.Debugf("Application added")
 
 	c.queue.AddRateLimited(obj)
 }
 
 func (c *Controller) handleDelete(obj interface{}) {
-	klog.Info("Application deleted")
+	log.Debugf("Application deleted")
 
 	c.queue.AddRateLimited(obj)
 }
 
 func (c *Controller) handleUdate(old, new interface{}) {
-	klog.Info("Application updated")
+	log.Debugf("Application updated")
 
 	oldApp, oldOk := old.(*v1alpha1.Application)
 	newApp, newOk := new.(*v1alpha1.Application)
 	if !oldOk || !newOk {
-		klog.Error("Error decoding object, invalid type")
+		log.Error("Error decoding object, invalid type")
 		return
 	}
 
 	// Compare old and new spec
 	if equality.Semantic.DeepEqual(oldApp.Spec, newApp.Spec) {
-		klog.Info("No changes in spec, skipping")
+		log.Debugf("No changes in spec, skipping")
 		return
 	}
 

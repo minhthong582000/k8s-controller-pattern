@@ -16,8 +16,11 @@ spec:
         app: gitops-controller
     spec:
       containers:
-        - image: ghcr.io/thongdepzai-cloud/gitops-controller:latest
+        - image: ghcr.io/minhthong582000/k8s-controller-pattern/gitops:v0.1.0-alpha.6
           name: gitops-controller
+          args:
+            - --log-level=debug
+            - --workers=2
           resources:
             limits:
               cpu: 100m
