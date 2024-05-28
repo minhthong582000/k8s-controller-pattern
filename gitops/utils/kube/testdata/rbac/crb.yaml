@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: thongdepzai-cloud-gitops-controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: thongdepzai-cloud-gitops-controller
+subjects:
+  - kind: ServiceAccount
+    name: thongdepzai-cloud-gitops-controller
+    namespace: default

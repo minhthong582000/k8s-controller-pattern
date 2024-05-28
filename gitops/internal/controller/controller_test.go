@@ -13,7 +13,7 @@ import (
 	appclientset "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned/fake"
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
-	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/k8s"
+	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube"
 	"github.com/stretchr/testify/assert"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,7 +35,7 @@ func newFakeController(apps ...runtime.Object) *Controller {
 	kubeClientSet := fake.NewSimpleClientset()
 	appClientSet := appclientset.NewSimpleClientset(apps...)
 	gitClient := git.NewGitClient("")
-	k8sUtil := k8sutil.NewK8s()
+	k8sUtil := k8sutil.NewK8s(nil, nil)
 	appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
 
 	return NewController(
@@ -56,12 +56,26 @@ var (
 		expectedErr    string
 	}{
 		{
-			name: "Normal application",
+			name: "Normal application 1",
 			app: `
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
-  name: example-application
+  name: test-example-application-one
+spec:
+  repository: https://github.com/minhthong582000/k8s-controller-pattern.git
+  revision: main
+  path: k8s-controller-pattern/gitops
+`,
+			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusHealthy),
+		},
+		{
+			name: "Normal application 2",
+			app: `
+kind: Application
+apiVersion: thongdepzai.cloud/v1alpha1
+metadata:
+  name: test-example-application-two
 spec:
   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
   revision: main
@@ -137,7 +151,7 @@ var (
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
-  name: another-example-application
+  name: test-another-example-application-one
 spec:
   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
   revision: main
@@ -150,7 +164,7 @@ spec:
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
-  name: another-example-application
+  name: test-another-example-application-two
 spec:
   repository: https://github.com/kubernetes/kubernetes-but-not-exist.git
   revision: main

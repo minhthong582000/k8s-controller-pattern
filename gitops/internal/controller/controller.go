@@ -15,7 +15,7 @@ import (
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions/application/v1alpha1"
 	applisters "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/listers/application/v1alpha1"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
-	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/k8s"
+	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
@@ -190,7 +190,7 @@ func (c *Controller) processNextItem() bool {
 
 func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Application) error {
 	repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
-
+	log.Println(repoPath)
 	err := c.updateAppStatus(
 		ctx,
 		app,
@@ -217,34 +217,39 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 	}
 	log.Debugf("Checked out revision %s", app.Spec.Revision)
 
-	// Generate manifests
-	oldResources, err := c.k8sUtil.GenerateManifests(path.Join(repoPath, app.Spec.Path))
-	if err != nil {
-		return fmt.Errorf("error generating manifests: %s", err)
-	}
+	// // Generate manifests
+	// log.Infof("Generating manifests for application %s", app.Name)
+	// generatedResources, err := c.k8sUtil.GenerateManifests(path.Join(repoPath, app.Spec.Path))
+	// if err != nil {
+	// 	return fmt.Errorf("error generating manifests: %s", err)
+	// }
 
-	// Get current resources
-	label := fmt.Sprintf("%s=%s", common.LabelKeyAppInstance, app.Name)
-	newResources, err := c.k8sUtil.GetResourceWithLabel(label)
-	if err != nil {
-		return fmt.Errorf("error getting resources with label: %s, %s", label, err)
-	}
+	// // Get current resources
+	// log.Infof("Getting resources for application %s", app.Name)
+	// label := map[string]string{
+	// 	common.LabelKeyAppInstance: app.Name,
+	// }
+	// currentResources, err := c.k8sUtil.GetResourceWithLabel(label)
+	// if err != nil {
+	// 	return fmt.Errorf("error getting resources with label: %s, %s", label, err)
+	// }
 
-	// Calculate diff
-	diff, err := c.k8sUtil.DiffResources(oldResources, newResources)
-	if err != nil {
-		return fmt.Errorf("error diffing resources: %s", err)
-	}
-	if !diff {
-		log.Info("No changes in resources, skipping")
-		return nil
-	}
+	// // Calculate diff
+	// log.Infof("Diffing resources for application %s", app.Name)
+	// diff, err := c.k8sUtil.DiffResources(generatedResources, currentResources)
+	// if err != nil {
+	// 	return fmt.Errorf("error diffing resources: %s", err)
+	// }
+	// if !diff {
+	// 	log.Info("No changes in resources, skipping")
+	// 	return nil
+	// }
 
-	// Apply manifests
-	err = c.k8sUtil.ApplyResource(path.Join(repoPath, app.Spec.Path))
-	if err != nil {
-		return fmt.Errorf("error applying resources: %s", err)
-	}
+	// // Apply manifests
+	// err = c.k8sUtil.ApplyResource(path.Join(repoPath, app.Spec.Path))
+	// if err != nil {
+	// 	return fmt.Errorf("error applying resources: %s", err)
+	// }
 
 	err = c.updateAppStatus(
 		ctx,

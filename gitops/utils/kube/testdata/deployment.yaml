@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gitops-controller
+  name: gitops-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gitops-controller
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: gitops-controller
+    spec:
+      containers:
+        - image: ghcr.io/minhthong582000/k8s-controller-pattern/gitops:v0.1.0-alpha.6
+          name: gitops-controller
+          args:
+            - --log-level=debug
+            - --workers=2
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      serviceAccountName: thongdepzai-cloud-gitops-controller
