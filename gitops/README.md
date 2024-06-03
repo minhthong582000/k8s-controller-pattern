@@ -34,6 +34,13 @@ kubectl apply -Rf deploy/example
 Run the controller:
 
 ```bash
-go run main.go \
-    --kubeconfig ~/.kube/config \
+go run main.go run \
+    -k ~/.kube/config \
+    -l info
+```
+
+Or you can run the controller in Kubernetes:
+
+```bash
+kubectl apply -Rf deploy
 ```
