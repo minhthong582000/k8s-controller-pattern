@@ -43,9 +43,7 @@ func TestGitClient_CloneOrFetch_CleanUp(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			path := path.Join(os.TempDir(), strings.Replace(tt.url, "/", "_", -1))
 
-			g := &gitClient{
-				token: tt.gitClient.token,
-			}
+			g := NewGitClient(tt.gitClient.token)
 			err := g.CloneOrFetch(tt.url, path)
 			if err != nil {
 				assert.Equal(t, tt.expectedErr, err.Error())
@@ -55,11 +53,14 @@ func TestGitClient_CloneOrFetch_CleanUp(t *testing.T) {
 			err = g.CloneOrFetch(tt.url, path)
 			if err != nil {
 				assert.Equal(t, tt.expectedErr, err.Error())
+				return
 			}
+			assert.DirExists(t, path)
 
 			// Clean up
 			err = g.CleanUp(path)
 			assert.NoError(t, err)
+			assert.NoDirExists(t, path)
 		})
 	}
 }

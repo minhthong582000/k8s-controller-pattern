@@ -49,11 +49,9 @@ func (g *gitClient) CloneOrFetch(url, path string) error {
 		if err != nil {
 			return fmt.Errorf("failed to clone repository: %w", err)
 		}
-
-		return nil
 	}
 
-	// Fetch the latest changes if it's already cloned
+	// Fetch the latest changes
 	r, err := git.PlainOpen(path)
 	if err != nil {
 		return fmt.Errorf("failed to open repository: %w", err)

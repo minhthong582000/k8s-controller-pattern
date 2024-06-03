@@ -8,9 +8,10 @@ import (
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/signals"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
-	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/k8s"
+	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube"
 	logutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/log"
 	"github.com/spf13/cobra"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -50,11 +51,8 @@ var runCmd = &cobra.Command{
 				return err
 			}
 		}
-
 		config.Timeout = 120 * time.Second
 
-		gitClient := git.NewGitClient("")
-		k8sutil := k8sutil.NewK8s()
 		appClientSet, err := appclient.NewForConfig(config)
 		if err != nil {
 			return err
@@ -63,13 +61,26 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+
+		// Set up the git client
+		gitUtil := git.NewGitClient("")
+		dynClientSet, err := dynamic.NewForConfig(config)
+		if err != nil {
+			return err
+		}
+
+		// Set up k8s utility
+		discoveryClient := clientSet.Discovery()
+		k8sutil := k8sutil.NewK8s(discoveryClient, dynClientSet)
+
+		// Set up the controller
 		appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
 		stopCh := signals.SetupSignalHandler()
 		ctrl := controller.NewController(
 			clientSet,
 			appClientSet,
 			appInformerFactory.Thongdepzai().V1alpha1().Applications(),
-			gitClient,
+			gitUtil,
 			k8sutil,
 		)
 		appInformerFactory.Start(stopCh)
