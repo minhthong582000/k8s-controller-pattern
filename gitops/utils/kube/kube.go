@@ -33,7 +33,7 @@ type k8s struct {
 	dynClientSet    dynamic.Interface
 }
 
-func NewK8s(discoveryClient discovery.DiscoveryInterface, dynClientSet dynamic.Interface) K8s {
+func NewK8s(discoveryClient discovery.DiscoveryInterface, dynClientSet dynamic.Interface) *k8s {
 	return &k8s{
 		discoveryClient: discoveryClient,
 		dynClientSet:    dynClientSet,
@@ -103,7 +103,6 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("Found %d API resources", len(serverResources))
 
 	wg.Add(len(serverResources))
 	for _, group := range serverResources {
@@ -111,8 +110,6 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 			defer wg.Done()
 
 			for _, resource := range group.APIResources {
-				log.Debugf("Listing resource %s", resource.Name)
-
 				// Skip subresources like pod/logs, pod/status
 				if containsSlash(resource.Name) {
 					continue
@@ -128,21 +125,10 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 				}
 
 				var list *unstructured.UnstructuredList
-
-				// List cluster-scoped resources
-				if !resource.Namespaced {
-					list, err = k.dynClientSet.Resource(gvr).List(context.TODO(), listOption)
-					if err != nil {
-						log.Errorf("Error listing resource %s: %s", gvr.String(), err)
-						return
-					}
-				} else {
-					// List namespace-scoped resources
-					list, err = k.dynClientSet.Resource(gvr).List(context.TODO(), listOption)
-					if err != nil {
-						log.Errorf("Error listing resource %s: %s", gvr.String(), err)
-						return
-					}
+				list, err = k.dynClientSet.Resource(gvr).List(context.TODO(), listOption)
+				if err != nil {
+					log.Warningf("Error listing resource %s: %s", gvr.String(), err)
+					continue
 				}
 
 				// Append the resources to the list
@@ -154,7 +140,6 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 			}
 		}(group)
 	}
-
 	wg.Wait()
 
 	return objs, apiError
@@ -163,11 +148,6 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 func (k *k8s) DiffResources(current []*unstructured.Unstructured, new []*unstructured.Unstructured) (bool, error) {
 	isChanged := false
 
-	if len(new) == 0 {
-		log.Debugf("Resources are empty, deleting all resources")
-		return true, nil
-	}
-
 	// Should use a cache to store current resources
 	hashTable := make(map[string]*unstructured.Unstructured)
 	for _, c := range current {
@@ -175,7 +155,8 @@ func (k *k8s) DiffResources(current []*unstructured.Unstructured, new []*unstruc
 	}
 
 	for _, n := range new {
-		c, ok := hashTable[n.GetKind()+n.GetName()]
+		key := n.GetKind() + n.GetName()
+		c, ok := hashTable[key]
 		if !ok {
 			log.Debugf("Found new resource %s with name %s", n.GetKind(), n.GetName())
 			isChanged = true
@@ -186,6 +167,15 @@ func (k *k8s) DiffResources(current []*unstructured.Unstructured, new []*unstruc
 			log.Debugf("Resource %s with name %s has changed", n.GetKind(), n.GetName())
 			isChanged = true
 		}
+		delete(hashTable, key)
+	}
+
+	// Check if there are resources that need to be deleted
+	if len(hashTable) > 0 {
+		for _, c := range hashTable {
+			log.Debugf("Resource %s with name %s should be deleted", c.GetKind(), c.GetName())
+		}
+		isChanged = true
 	}
 
 	return isChanged, nil

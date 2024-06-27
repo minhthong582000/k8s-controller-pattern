@@ -19,7 +19,7 @@ type gitClient struct {
 	token string
 }
 
-func NewGitClient(token string) GitClient {
+func NewGitClient(token string) *gitClient {
 	return &gitClient{
 		token: token,
 	}
