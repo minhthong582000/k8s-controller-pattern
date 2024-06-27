@@ -110,24 +110,20 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 			defer wg.Done()
 
 			for _, resource := range group.APIResources {
-				// Skip subresources like pod/logs, pod/status
-				if containsSlash(resource.Name) {
-					continue
+				gv, err := schema.ParseGroupVersion(group.GroupVersion)
+				if err != nil {
+					log.Warningf("parsing GroupVersion %s failed: %s", group.GroupVersion, err)
 				}
 				gvr := schema.GroupVersionResource{
-					Group:    group.GroupVersion,
-					Version:  resource.Version,
+					Group:    gv.Group,
+					Version:  gv.Version,
 					Resource: resource.Name,
-				}
-				if gvr.Group == "v1" {
-					gvr.Version = gvr.Group
-					gvr.Group = ""
 				}
 
 				var list *unstructured.UnstructuredList
 				list, err = k.dynClientSet.Resource(gvr).List(context.TODO(), listOption)
 				if err != nil {
-					log.Warningf("Error listing resource %s: %s", gvr.String(), err)
+					log.Warningf("Error listing resource %s, %s", gvr.String(), err)
 					continue
 				}
 
@@ -187,8 +183,4 @@ func (k *k8s) SetLabelsForResources(resources []*unstructured.Unstructured, labe
 	}
 
 	return nil
-}
-
-func containsSlash(s string) bool {
-	return len(s) > 0 && s[0] == '/'
 }
