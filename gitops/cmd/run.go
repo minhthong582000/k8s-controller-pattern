@@ -52,6 +52,8 @@ var runCmd = &cobra.Command{
 			}
 		}
 		config.Timeout = 120 * time.Second
+		config.QPS = 1000
+		config.Burst = 1000
 
 		appClientSet, err := appclient.NewForConfig(config)
 		if err != nil {
