@@ -3,12 +3,10 @@ kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
   name: example-application
-  labels:
-    thongdepzai.cloud/app: example-application
 spec:
   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
-  revision: feat/kube-util-impl
-  path: k8s-controller-pattern/gitops/utils/kube/testdata
+  revision: main
+  path: gitops/utils/kube/testdata
 # ---
 # kind: Application
 # apiVersion: thongdepzai.cloud/v1alpha1

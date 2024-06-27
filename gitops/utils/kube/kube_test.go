@@ -189,6 +189,30 @@ func Test_DiffResources(t *testing.T) {
 			new:            []*unstructured.Unstructured{},
 			expectedResult: true,
 		},
+		{
+			name:    "Should return true when resources exist in new but not in the current",
+			current: []*unstructured.Unstructured{},
+			new: []*unstructured.Unstructured{
+				{
+					Object: map[string]interface{}{
+						"kind":       "Pod",
+						"apiVersion": "v1",
+						"metadata": map[string]interface{}{
+							"name": "nginx",
+						},
+						"spec": map[string]interface{}{
+							"containers": []map[string]interface{}{
+								{
+									"name":  "nginx",
+									"image": "nginx:1.26",
+								},
+							},
+						},
+					},
+				},
+			},
+			expectedResult: true,
+		},
 	}
 
 	for _, tt := range testCases {

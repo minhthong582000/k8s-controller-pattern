@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -13,8 +14,11 @@ import (
 	appclientset "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/clientset/versioned/fake"
 	appinformers "github.com/minhthong582000/k8s-controller-pattern/gitops/pkg/informers/externalversions"
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
-	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube"
+	gitMock "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git/mock"
+	k8sUtil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube"
+	k8sUtilMock "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube/mock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
@@ -31,11 +35,9 @@ func newFakeApp(appString string) *v1alpha1.Application {
 	return &app
 }
 
-func newFakeController(apps ...runtime.Object) *Controller {
+func newFakeController(gitClient git.GitClient, k8sUtil k8sUtil.K8s, apps ...runtime.Object) *Controller {
 	kubeClientSet := fake.NewSimpleClientset()
 	appClientSet := appclientset.NewSimpleClientset(apps...)
-	gitClient := git.NewGitClient("")
-	k8sUtil := k8sutil.NewK8s(nil, nil)
 	appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
 
 	return NewController(
@@ -47,16 +49,20 @@ func newFakeController(apps ...runtime.Object) *Controller {
 	)
 }
 
-var (
-	createResourcesTestCases = []struct {
+func Test_CreateResources(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	createResourcesTestCases := []struct {
 		name           string
 		app            string
+		mockGitClient  git.GitClient
+		mockk8sUtil    k8sUtil.K8s
 		expectedOut    string
 		expectedStatus v1alpha1.HealthStatusCode
 		expectedErr    string
 	}{
 		{
-			name: "Normal application 1",
+			name: "Should create resources successfully if the repository is valid",
 			app: `
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
@@ -67,24 +73,51 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
+			mockGitClient: func() git.GitClient {
+				mock := gitMock.NewMockGitClient(ctrl)
+				mock.EXPECT().CloneOrFetch(gomock.Any(), gomock.Any()).Return(nil)
+				mock.EXPECT().Checkout(gomock.Any(), gomock.Any()).Return("randomsha", nil)
+				return mock
+			}(),
+			mockk8sUtil: func() k8sUtil.K8s {
+				mock := k8sUtilMock.NewMockK8s(ctrl)
+				mock.EXPECT().GenerateManifests(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().DiffResources(gomock.Any(), gomock.Any()).Return(true, nil)
+				mock.EXPECT().ApplyResource(gomock.Any()).Return(nil)
+				return mock
+			}(),
 			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusHealthy),
 		},
 		{
-			name: "Normal application 2",
+			name: "Should create resources successfully even if there is no diff between the old and new resources",
 			app: `
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
-  name: test-example-application-two
+  name: test-example-application-one
 spec:
   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
   revision: main
   path: k8s-controller-pattern/gitops
 `,
+			mockGitClient: func() git.GitClient {
+				mock := gitMock.NewMockGitClient(ctrl)
+				mock.EXPECT().CloneOrFetch(gomock.Any(), gomock.Any()).Return(nil)
+				mock.EXPECT().Checkout(gomock.Any(), gomock.Any()).Return("randomsha", nil)
+				return mock
+			}(),
+			mockk8sUtil: func() k8sUtil.K8s {
+				mock := k8sUtilMock.NewMockK8s(ctrl)
+				mock.EXPECT().GenerateManifests(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().DiffResources(gomock.Any(), gomock.Any()).Return(false, nil)
+				return mock
+			}(),
 			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusHealthy),
 		},
 		{
-			name: "Application with invalid repository",
+			name: "Should return error if the application has invalid repository",
 			app: `
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
@@ -95,35 +128,28 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
+			mockGitClient: func() git.GitClient {
+				mock := gitMock.NewMockGitClient(ctrl)
+				mock.EXPECT().CloneOrFetch(gomock.Any(), gomock.Any()).Return(
+					fmt.Errorf("failed to clone repository: authentication required"),
+				)
+				return mock
+			}(),
 			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusProgressing),
 			expectedErr:    "error cloning repository: failed to clone repository: authentication required",
 		},
 	}
-)
 
-func Test_CreateResources(t *testing.T) {
 	for _, tt := range createResourcesTestCases {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
 
 			app := newFakeApp(tt.app)
-			controller := newFakeController(app)
+			controller := newFakeController(tt.mockGitClient, tt.mockk8sUtil, app)
 
 			err := controller.createResources(ctx, app)
 			if err != nil {
 				assert.Equal(t, tt.expectedErr, err.Error())
-			} else {
-				repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
-
-				// Check if git repository is cloned
-				assert.DirExists(t, repoPath)
-
-				// TODO: check if the revision is checked out
-
-				// Delete the git repository
-				err = os.RemoveAll(repoPath)
-				assert.NoError(t, err)
-				assert.NoDirExists(t, repoPath)
 			}
 
 			// Check the status of the application
@@ -137,16 +163,20 @@ func Test_CreateResources(t *testing.T) {
 	}
 }
 
-var (
-	deleteResourcesTestCases = []struct {
+func Test_DeleteResources(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	testCases := []struct {
 		name           string
 		app            string
+		mockGitClient  git.GitClient
+		mockk8sUtil    k8sUtil.K8s
 		expectedOut    string
 		expectedStatus string
 		expectedErr    string
 	}{
 		{
-			name: "Normal application",
+			name: "Should delete resources successfully if the application is valid",
 			app: `
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
@@ -157,9 +187,19 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
+			mockGitClient: func() git.GitClient {
+				mock := gitMock.NewMockGitClient(ctrl)
+				mock.EXPECT().CleanUp(gomock.Any()).Return(nil)
+				return mock
+			}(),
+			mockk8sUtil: func() k8sUtil.K8s {
+				mock := k8sUtilMock.NewMockK8s(ctrl)
+				mock.EXPECT().DeleteResource(gomock.Any()).Return(nil)
+				return mock
+			}(),
 		},
 		{
-			name: "Application with invalid repository",
+			name: "Should delete resources successfully even if the application has invalid repository",
 			app: `
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
@@ -170,15 +210,23 @@ spec:
   revision: main
   path: k8s-controller-pattern/gitops
 `,
+			mockGitClient: func() git.GitClient {
+				mock := gitMock.NewMockGitClient(ctrl)
+				mock.EXPECT().CleanUp(gomock.Any()).Return(nil)
+				return mock
+			}(),
+			mockk8sUtil: func() k8sUtil.K8s {
+				mock := k8sUtilMock.NewMockK8s(ctrl)
+				mock.EXPECT().DeleteResource(gomock.Any()).Return(nil)
+				return mock
+			}(),
 		},
 	}
-)
 
-func Test_DeleteResources(t *testing.T) {
-	for _, tt := range deleteResourcesTestCases {
+	for _, tt := range testCases {
 		t.Run(tt.name, func(t *testing.T) {
 			app := newFakeApp(tt.app)
-			controller := newFakeController(app)
+			controller := newFakeController(tt.mockGitClient, tt.mockk8sUtil, app)
 
 			// Create a fake git repository
 			repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
@@ -191,9 +239,6 @@ func Test_DeleteResources(t *testing.T) {
 			if err != nil {
 				assert.Equal(t, tt.expectedErr, err.Error())
 			}
-
-			// Check if the git repository is deleted
-			assert.NoDirExists(t, repoPath)
 		})
 	}
 }

@@ -217,39 +217,38 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 	}
 	log.Debugf("Checked out revision %s", app.Spec.Revision)
 
-	// // Generate manifests
-	// log.Infof("Generating manifests for application %s", app.Name)
-	// generatedResources, err := c.k8sUtil.GenerateManifests(path.Join(repoPath, app.Spec.Path))
-	// if err != nil {
-	// 	return fmt.Errorf("error generating manifests: %s", err)
-	// }
+	// Generate manifests
+	log.Infof("Generating manifests for application %s", app.Name)
+	generatedResources, err := c.k8sUtil.GenerateManifests(path.Join(repoPath, app.Spec.Path))
+	if err != nil {
+		return fmt.Errorf("error generating manifests: %s", err)
+	}
 
-	// // Get current resources
-	// log.Infof("Getting resources for application %s", app.Name)
-	// label := map[string]string{
-	// 	common.LabelKeyAppInstance: app.Name,
-	// }
-	// currentResources, err := c.k8sUtil.GetResourceWithLabel(label)
-	// if err != nil {
-	// 	return fmt.Errorf("error getting resources with label: %s, %s", label, err)
-	// }
+	// Get current resources
+	log.Infof("Getting resources for application %s", app.Name)
+	label := map[string]string{
+		common.LabelKeyAppInstance: app.Name,
+	}
+	currentResources, err := c.k8sUtil.GetResourceWithLabel(label)
+	if err != nil {
+		return fmt.Errorf("error getting resources with label: %s, %s", label, err)
+	}
 
-	// // Calculate diff
-	// log.Infof("Diffing resources for application %s", app.Name)
-	// diff, err := c.k8sUtil.DiffResources(generatedResources, currentResources)
-	// if err != nil {
-	// 	return fmt.Errorf("error diffing resources: %s", err)
-	// }
-	// if !diff {
-	// 	log.Info("No changes in resources, skipping")
-	// 	return nil
-	// }
-
-	// // Apply manifests
-	// err = c.k8sUtil.ApplyResource(path.Join(repoPath, app.Spec.Path))
-	// if err != nil {
-	// 	return fmt.Errorf("error applying resources: %s", err)
-	// }
+	// Calculate diff
+	log.Infof("Diffing resources for application %s", app.Name)
+	diff, err := c.k8sUtil.DiffResources(currentResources, generatedResources)
+	if err != nil {
+		return fmt.Errorf("error diffing resources: %s", err)
+	}
+	if diff {
+		// Apply manifests
+		err = c.k8sUtil.ApplyResource(path.Join(repoPath, app.Spec.Path))
+		if err != nil {
+			return fmt.Errorf("error applying resources: %s", err)
+		}
+	} else {
+		log.WithField("application", app.Name).Info("No changes in resources")
+	}
 
 	err = c.updateAppStatus(
 		ctx,
@@ -279,7 +278,12 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 	repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
 
 	log.WithField("application", app.Name).Info("Deleting resources")
-	err := c.gitUtil.CleanUp(repoPath)
+	err := c.k8sUtil.DeleteResource(path.Join(repoPath, app.Spec.Path))
+	if err != nil {
+		return fmt.Errorf("error deleting resources: %s", err)
+	}
+
+	err = c.gitUtil.CleanUp(repoPath)
 	if err != nil {
 		return fmt.Errorf("error cleaning up repository: %s", err)
 	}
