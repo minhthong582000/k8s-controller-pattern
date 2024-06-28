@@ -234,6 +234,15 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		return fmt.Errorf("error getting resources with label: %s, %s", label, err)
 	}
 
+	// Set the label for the generated resources
+	label = map[string]string{
+		common.LabelKeyAppInstance: app.Name,
+	}
+	err = c.k8sUtil.SetLabelsForResources(generatedResources, label)
+	if err != nil {
+		return fmt.Errorf("error setting labels for resources: %s", err)
+	}
+
 	// Calculate diff
 	log.Infof("Diffing resources for application %s", app.Name)
 	diff, err := c.k8sUtil.DiffResources(currentResources, generatedResources)

@@ -81,6 +81,7 @@ spec:
 				mock.EXPECT().GenerateManifests(gomock.Any()).Return(nil, nil)
 				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
 				mock.EXPECT().DiffResources(gomock.Any(), gomock.Any()).Return(true, nil)
+				mock.EXPECT().SetLabelsForResources(gomock.Any(), gomock.Any()).Return(nil)
 				mock.EXPECT().ApplyResources(gomock.Any()).Return(nil)
 				return mock
 			}(),
@@ -108,6 +109,7 @@ spec:
 				mock := k8sUtilMock.NewMockK8s(ctrl)
 				mock.EXPECT().GenerateManifests(gomock.Any()).Return(nil, nil)
 				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().SetLabelsForResources(gomock.Any(), gomock.Any()).Return(nil)
 				mock.EXPECT().DiffResources(gomock.Any(), gomock.Any()).Return(false, nil)
 				return mock
 			}(),
