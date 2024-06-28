@@ -5,11 +5,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
+	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
@@ -20,8 +23,8 @@ import (
 )
 
 type K8s interface {
-	ApplyResource(path string) error
-	DeleteResource(path string) error
+	ApplyResources(path string) error
+	DeleteResource(ctx context.Context, currentObj *unstructured.Unstructured, namespace string) error
 	GenerateManifests(path string) ([]*unstructured.Unstructured, error)
 	GetResourceWithLabel(label map[string]string) ([]*unstructured.Unstructured, error)
 	DiffResources(old []*unstructured.Unstructured, new []*unstructured.Unstructured) (bool, error)
@@ -40,12 +43,33 @@ func NewK8s(discoveryClient discovery.DiscoveryInterface, dynClientSet dynamic.I
 	}
 }
 
-func (k *k8s) ApplyResource(path string) error {
-	return nil
+func (k *k8s) ApplyResources(path string) error {
+	// Run kubeclt apply -f path
+	cmd := exec.Command("kubectl", "apply", "-Rf", path)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }
 
-func (k *k8s) DeleteResource(path string) error {
-	return nil
+func (k *k8s) DeleteResource(ctx context.Context, currentObj *unstructured.Unstructured, namespace string) error {
+	gvk := currentObj.GroupVersionKind()
+	apiResource, err := ServerResourceForGroupVersionKind(
+		k.discoveryClient,
+		gvk,
+		"delete",
+	)
+	if err != nil {
+		return err
+	}
+
+	resource := gvk.GroupVersion().WithResource(apiResource.Name)
+
+	var dynInterface dynamic.ResourceInterface = k.dynClientSet.Resource(resource)
+	if apiResource.Namespaced {
+		dynInterface = k.dynClientSet.Resource(resource).Namespace(namespace)
+	}
+	return dynInterface.Delete(ctx, currentObj.GetName(), metav1.DeleteOptions{})
 }
 
 func (k *k8s) GenerateManifests(path string) ([]*unstructured.Unstructured, error) {
@@ -183,4 +207,46 @@ func (k *k8s) SetLabelsForResources(resources []*unstructured.Unstructured, labe
 	}
 
 	return nil
+}
+
+func ServerResourceForGroupVersionKind(disco discovery.DiscoveryInterface, gvk schema.GroupVersionKind, verb string) (*metav1.APIResource, error) {
+	// default is to return a not found for the requested resource
+	retErr := apierr.NewNotFound(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, "")
+	resources, err := disco.ServerResourcesForGroupVersion(gvk.GroupVersion().String())
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range resources.APIResources {
+		if r.Kind == gvk.Kind {
+			if isSupportedVerb(&r, verb) {
+				return &r, nil
+			} else {
+				// We have a match, but the API does not support the action
+				// that was requested. Memorize this.
+				retErr = apierr.NewMethodNotSupported(schema.GroupResource{Group: gvk.Group, Resource: gvk.Kind}, verb)
+			}
+		}
+	}
+	return nil, retErr
+}
+
+// isSupportedVerb returns whether or not a APIResource supports a specific verb.
+// The verb will be matched case-insensitive.
+func isSupportedVerb(apiResource *metav1.APIResource, verb string) bool {
+	if verb == "" || verb == "*" {
+		return true
+	}
+	for _, v := range apiResource.Verbs {
+		if strings.EqualFold(v, verb) {
+			return true
+		}
+	}
+	return false
+}
+
+func ToResourceInterface(dynamicIf dynamic.Interface, apiResource *metav1.APIResource, resource schema.GroupVersionResource, namespace string) dynamic.ResourceInterface {
+	if apiResource.Namespaced {
+		return dynamicIf.Resource(resource).Namespace(namespace)
+	}
+	return dynamicIf.Resource(resource)
 }

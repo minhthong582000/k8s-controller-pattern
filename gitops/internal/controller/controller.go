@@ -242,7 +242,7 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 	}
 	if diff {
 		// Apply manifests
-		err = c.k8sUtil.ApplyResource(path.Join(repoPath, app.Spec.Path))
+		err = c.k8sUtil.ApplyResources(path.Join(repoPath, app.Spec.Path))
 		if err != nil {
 			return fmt.Errorf("error applying resources: %s", err)
 		}
@@ -277,10 +277,21 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 
 	repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
 
-	log.WithField("application", app.Name).Info("Deleting resources")
-	err := c.k8sUtil.DeleteResource(path.Join(repoPath, app.Spec.Path))
+	// Get all resources with the label
+	label := map[string]string{
+		common.LabelKeyAppInstance: app.Name,
+	}
+	resources, err := c.k8sUtil.GetResourceWithLabel(label)
 	if err != nil {
-		return fmt.Errorf("error deleting resources: %s", err)
+		return fmt.Errorf("error getting resources with label: %s, %s", label, err)
+	}
+
+	log.WithField("application", app.Name).Info("Deleting resources")
+	for _, r := range resources {
+		err := c.k8sUtil.DeleteResource(context.Background(), r, r.GetNamespace())
+		if err != nil {
+			log.Errorf("error deleting resources: %s", err)
+		}
 	}
 
 	err = c.gitUtil.CleanUp(repoPath)

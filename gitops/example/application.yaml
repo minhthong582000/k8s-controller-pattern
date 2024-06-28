@@ -6,15 +6,4 @@ metadata:
 spec:
   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
   revision: main
-  path: gitops/utils/kube/testdata
-# ---
-# kind: Application
-# apiVersion: thongdepzai.cloud/v1alpha1
-# metadata:
-#   name: example-application-two
-#   labels:
-#     thongdepzai.cloud/app: example-application-two
-# spec:
-#   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
-#   revision: main
-#   path: k8s-controller-pattern/gitops
+  path: gitops/example/nginx

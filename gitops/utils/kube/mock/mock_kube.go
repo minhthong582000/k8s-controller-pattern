@@ -10,6 +10,7 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "go.uber.org/mock/gomock"
@@ -39,32 +40,32 @@ func (m *MockK8s) EXPECT() *MockK8sMockRecorder {
 	return m.recorder
 }
 
-// ApplyResource mocks base method.
-func (m *MockK8s) ApplyResource(arg0 string) error {
+// ApplyResources mocks base method.
+func (m *MockK8s) ApplyResources(arg0 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyResource", arg0)
+	ret := m.ctrl.Call(m, "ApplyResources", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ApplyResource indicates an expected call of ApplyResource.
-func (mr *MockK8sMockRecorder) ApplyResource(arg0 any) *gomock.Call {
+// ApplyResources indicates an expected call of ApplyResources.
+func (mr *MockK8sMockRecorder) ApplyResources(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyResource", reflect.TypeOf((*MockK8s)(nil).ApplyResource), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyResources", reflect.TypeOf((*MockK8s)(nil).ApplyResources), arg0)
 }
 
 // DeleteResource mocks base method.
-func (m *MockK8s) DeleteResource(arg0 string) error {
+func (m *MockK8s) DeleteResource(arg0 context.Context, arg1 *unstructured.Unstructured, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteResource", arg0)
+	ret := m.ctrl.Call(m, "DeleteResource", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteResource indicates an expected call of DeleteResource.
-func (mr *MockK8sMockRecorder) DeleteResource(arg0 any) *gomock.Call {
+func (mr *MockK8sMockRecorder) DeleteResource(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteResource", reflect.TypeOf((*MockK8s)(nil).DeleteResource), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteResource", reflect.TypeOf((*MockK8s)(nil).DeleteResource), arg0, arg1, arg2)
 }
 
 // DiffResources mocks base method.

@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-	"path"
-	"strings"
 	"testing"
 	"time"
 
@@ -84,7 +81,7 @@ spec:
 				mock.EXPECT().GenerateManifests(gomock.Any()).Return(nil, nil)
 				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
 				mock.EXPECT().DiffResources(gomock.Any(), gomock.Any()).Return(true, nil)
-				mock.EXPECT().ApplyResource(gomock.Any()).Return(nil)
+				mock.EXPECT().ApplyResources(gomock.Any()).Return(nil)
 				return mock
 			}(),
 			expectedStatus: v1alpha1.HealthStatusCode(v1alpha1.HealthStatusHealthy),
@@ -194,7 +191,8 @@ spec:
 			}(),
 			mockk8sUtil: func() k8sUtil.K8s {
 				mock := k8sUtilMock.NewMockK8s(ctrl)
-				mock.EXPECT().DeleteResource(gomock.Any()).Return(nil)
+				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().DeleteResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				return mock
 			}(),
 		},
@@ -217,7 +215,8 @@ spec:
 			}(),
 			mockk8sUtil: func() k8sUtil.K8s {
 				mock := k8sUtilMock.NewMockK8s(ctrl)
-				mock.EXPECT().DeleteResource(gomock.Any()).Return(nil)
+				mock.EXPECT().GetResourceWithLabel(gomock.Any()).Return(nil, nil)
+				mock.EXPECT().DeleteResource(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
 				return mock
 			}(),
 		},
@@ -228,14 +227,8 @@ spec:
 			app := newFakeApp(tt.app)
 			controller := newFakeController(tt.mockGitClient, tt.mockk8sUtil, app)
 
-			// Create a fake git repository
-			repoPath := path.Join(os.TempDir(), app.Name, strings.Replace(app.Spec.Repository, "/", "_", -1))
-			err := os.MkdirAll(repoPath, os.ModePerm)
-			assert.NoError(t, err)
-			assert.DirExists(t, repoPath)
-
 			// Delete resources
-			err = controller.deleteResources(app)
+			err := controller.deleteResources(app)
 			if err != nil {
 				assert.Equal(t, tt.expectedErr, err.Error())
 			}
