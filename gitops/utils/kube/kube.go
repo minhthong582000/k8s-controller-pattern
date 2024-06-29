@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -16,14 +15,17 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	k8syaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/discovery"
 	"k8s.io/client-go/dynamic"
 )
 
 type K8s interface {
-	ApplyResources(path string) error
+	CreateResource(ctx context.Context, obj *unstructured.Unstructured, namespace string) error
+	PatchResource(ctx context.Context, currentObj *unstructured.Unstructured, namespace string) error
 	DeleteResource(ctx context.Context, currentObj *unstructured.Unstructured, namespace string) error
 	GenerateManifests(path string) ([]*unstructured.Unstructured, error)
 	GetResourceWithLabel(label map[string]string) ([]*unstructured.Unstructured, error)
@@ -43,13 +45,56 @@ func NewK8s(discoveryClient discovery.DiscoveryInterface, dynClientSet dynamic.I
 	}
 }
 
-func (k *k8s) ApplyResources(path string) error {
-	// Run kubeclt apply -f path
-	cmd := exec.Command("kubectl", "apply", "-Rf", path)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+func (k *k8s) CreateResource(ctx context.Context, obj *unstructured.Unstructured, namespace string) error {
+	gvk := obj.GroupVersionKind()
+	apiResource, err := ServerResourceForGroupVersionKind(
+		k.discoveryClient,
+		gvk,
+		"create",
+	)
+	if err != nil {
+		return err
+	}
 
-	return cmd.Run()
+	resource := gvk.GroupVersion().WithResource(apiResource.Name)
+
+	var dynInterface dynamic.ResourceInterface = k.dynClientSet.Resource(resource)
+	if apiResource.Namespaced {
+		dynInterface = k.dynClientSet.Resource(resource).Namespace(namespace)
+	}
+	_, err = dynInterface.Create(ctx, obj, metav1.CreateOptions{})
+	return err
+}
+
+func (k *k8s) PatchResource(ctx context.Context, currentObj *unstructured.Unstructured, namespace string) error {
+	gvk := currentObj.GroupVersionKind()
+	apiResource, err := ServerResourceForGroupVersionKind(
+		k.discoveryClient,
+		gvk,
+		"patch",
+	)
+	if err != nil {
+		return err
+	}
+
+	resource := gvk.GroupVersion().WithResource(apiResource.Name)
+
+	var dynInterface dynamic.ResourceInterface = k.dynClientSet.Resource(resource)
+	if apiResource.Namespaced {
+		dynInterface = k.dynClientSet.Resource(resource).Namespace(namespace)
+	}
+	outBytes, err := runtime.Encode(unstructured.UnstructuredJSONScheme, currentObj)
+	if err != nil {
+		return err
+	}
+	_, err = dynInterface.Patch(
+		ctx,
+		currentObj.GetName(),
+		types.ApplyPatchType,
+		outBytes,
+		metav1.PatchOptions{},
+	)
+	return err
 }
 
 func (k *k8s) DeleteResource(ctx context.Context, currentObj *unstructured.Unstructured, namespace string) error {
