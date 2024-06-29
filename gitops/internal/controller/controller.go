@@ -250,10 +250,13 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		return fmt.Errorf("error diffing resources: %s", err)
 	}
 	if diff {
-		// Apply manifests
-		err = c.k8sUtil.ApplyResources(path.Join(repoPath, app.Spec.Path))
-		if err != nil {
-			return fmt.Errorf("error applying resources: %s", err)
+		// Create resources
+		for _, r := range generatedResources {
+			// TODO: use namespace from application spec
+			err := c.k8sUtil.CreateResource(ctx, r, app.GetNamespace())
+			if err != nil {
+				return fmt.Errorf("error creating resources: %s", err)
+			}
 		}
 	} else {
 		log.WithField("application", app.Name).Info("No changes in resources")
@@ -299,7 +302,7 @@ func (c *Controller) deleteResources(app *v1alpha1.Application) error {
 	for _, r := range resources {
 		err := c.k8sUtil.DeleteResource(context.Background(), r, r.GetNamespace())
 		if err != nil {
-			log.Errorf("error deleting resources: %s", err)
+			return fmt.Errorf("error deleting resources: %s", err)
 		}
 	}
 

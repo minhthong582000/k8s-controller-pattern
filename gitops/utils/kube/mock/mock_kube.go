@@ -40,18 +40,18 @@ func (m *MockK8s) EXPECT() *MockK8sMockRecorder {
 	return m.recorder
 }
 
-// ApplyResources mocks base method.
-func (m *MockK8s) ApplyResources(arg0 string) error {
+// CreateResource mocks base method.
+func (m *MockK8s) CreateResource(arg0 context.Context, arg1 *unstructured.Unstructured, arg2 string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyResources", arg0)
+	ret := m.ctrl.Call(m, "CreateResource", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// ApplyResources indicates an expected call of ApplyResources.
-func (mr *MockK8sMockRecorder) ApplyResources(arg0 any) *gomock.Call {
+// CreateResource indicates an expected call of CreateResource.
+func (mr *MockK8sMockRecorder) CreateResource(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyResources", reflect.TypeOf((*MockK8s)(nil).ApplyResources), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateResource", reflect.TypeOf((*MockK8s)(nil).CreateResource), arg0, arg1, arg2)
 }
 
 // DeleteResource mocks base method.
@@ -111,6 +111,20 @@ func (m *MockK8s) GetResourceWithLabel(arg0 map[string]string) ([]*unstructured.
 func (mr *MockK8sMockRecorder) GetResourceWithLabel(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetResourceWithLabel", reflect.TypeOf((*MockK8s)(nil).GetResourceWithLabel), arg0)
+}
+
+// PatchResource mocks base method.
+func (m *MockK8s) PatchResource(arg0 context.Context, arg1 *unstructured.Unstructured, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PatchResource", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PatchResource indicates an expected call of PatchResource.
+func (mr *MockK8sMockRecorder) PatchResource(arg0, arg1, arg2 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PatchResource", reflect.TypeOf((*MockK8s)(nil).PatchResource), arg0, arg1, arg2)
 }
 
 // SetLabelsForResources mocks base method.
