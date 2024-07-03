@@ -6,6 +6,8 @@ What it does is whenever a new Deployment is created in "default" namespace, it 
 
 ![Kubernetes Controller Diagram](./docs/k8s-controller.drawio.svg)
 
+See also: [client-go under the hood](https://github.com/kubernetes/sample-controller/blob/master/docs/controller-client-go.md)
+
 ## How to run?
 
 ```bash
