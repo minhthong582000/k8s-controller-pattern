@@ -62,7 +62,11 @@ func (k *k8s) CreateResource(ctx context.Context, obj *unstructured.Unstructured
 	if apiResource.Namespaced {
 		dynInterface = k.dynClientSet.Resource(resource).Namespace(namespace)
 	}
-	_, err = dynInterface.Create(ctx, obj, metav1.CreateOptions{})
+
+	opts := metav1.ApplyOptions{
+		FieldManager: "application/apply-patch",
+	}
+	_, err = dynInterface.Apply(ctx, obj.GetName(), obj, opts)
 	return err
 }
 

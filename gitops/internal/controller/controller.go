@@ -253,7 +253,7 @@ func (c *Controller) createResources(ctx context.Context, app *v1alpha1.Applicat
 		// Create resources
 		for _, r := range generatedResources {
 			// TODO: use namespace from application spec
-			err := c.k8sUtil.CreateResource(ctx, r, app.GetNamespace())
+			err = c.k8sUtil.CreateResource(ctx, r, app.GetNamespace())
 			if err != nil {
 				return fmt.Errorf("error creating resources: %s", err)
 			}
