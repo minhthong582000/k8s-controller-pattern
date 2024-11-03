@@ -242,7 +242,7 @@ func (c *Controller) processNextAppRefreshItem() bool {
 			c.appRefreshQueue.AddRateLimited(appKey)
 			return nil, fmt.Errorf("error creating resources: %s", err)
 		}
-		c.queue.Forget(appKey)
+		c.appRefreshQueue.Forget(appKey)
 
 		return app, nil
 	}(appKey.(string))
