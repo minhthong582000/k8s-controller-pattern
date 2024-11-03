@@ -44,6 +44,9 @@ type Controller struct {
 	// Every time a new event detected by informer, it will be added to the queue
 	queue workqueue.RateLimitingInterface
 
+	// appRefreshQueue is used to reconcile the application periodically after created
+	appRefreshQueue workqueue.RateLimitingInterface
+
 	gitUtil git.GitClient
 
 	k8sUtil k8sutil.K8s
@@ -72,6 +75,10 @@ func NewController(
 		queue: workqueue.NewNamedRateLimitingQueue(
 			workqueue.DefaultControllerRateLimiter(),
 			"application",
+		),
+		appRefreshQueue: workqueue.NewNamedRateLimitingQueue(
+			workqueue.DefaultControllerRateLimiter(),
+			"application-reconcile",
 		),
 		gitUtil:       gitUtil,
 		k8sUtil:       k8sUtil,
@@ -107,6 +114,11 @@ func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) error {
 		go wait.Until(c.worker, 1*time.Second, stopCh)
 	}
 
+	for i := 0; i < numWorkers; i++ {
+		// Wait every 1 second to process the next item in the queue
+		go wait.Until(c.applicationRefreshWorker, 1*time.Second, stopCh)
+	}
+
 	<-stopCh
 
 	return nil
@@ -114,6 +126,11 @@ func (c *Controller) Run(numWorkers int, stopCh <-chan struct{}) error {
 
 func (c *Controller) worker() {
 	for c.processNextItem() {
+	}
+}
+
+func (c *Controller) applicationRefreshWorker() {
+	for c.processNextAppRefreshItem() {
 	}
 }
 
@@ -167,12 +184,9 @@ func (c *Controller) processNextItem() bool {
 			return fmt.Errorf("error getting deployment info: %s", err)
 		}
 
-		err = c.createResources(ctx, app)
-		if err != nil {
-			c.queue.AddRateLimited(obj)
-			return fmt.Errorf("error creating resources: %s", err)
-		}
-
+		// Hand it over to the refresh queue on creation
+		// TODO: use a cache instead of depending on Informer
+		c.requestAppRefresh(app.GetName(), app.GetNamespace())
 		c.queue.Forget(obj)
 
 		return nil
@@ -181,6 +195,61 @@ func (c *Controller) processNextItem() bool {
 	if err != nil {
 		utilruntime.HandleError(err)
 		c.updateAppStatus(ctx, obj.(*v1alpha1.Application), &v1alpha1.ApplicationStatus{
+			HealthStatus: v1alpha1.HealthStatusDegraded,
+		})
+	}
+
+	return true
+}
+
+func (c *Controller) processNextAppRefreshItem() bool {
+	ctx := context.Background()
+
+	appKey, shutdown := c.appRefreshQueue.Get()
+	if shutdown {
+		return false
+	}
+
+	log.Info("Processing application refresh " + appKey.(string))
+
+	// We wrap this block in a func so we can defer c.workqueue.Done.
+	app, err := func(appKey string) (*v1alpha1.Application, error) {
+		defer c.appRefreshQueue.Done(appKey)
+
+		// Split the key into namespace and name
+		ns, name, err := cache.SplitMetaNamespaceKey(appKey)
+		if err != nil {
+			// Since we can't process the item, we stop processing it
+			c.appRefreshQueue.Forget(appKey)
+			return nil, fmt.Errorf("error splitting key: %s", err)
+		}
+
+		app, err := c.appClientSet.ThongdepzaiV1alpha1().Applications(ns).Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			// This means the application is deleted while processing
+			if apierrors.IsNotFound(err) {
+				c.appRefreshQueue.Forget(appKey)
+				return app, nil
+			}
+
+			// If there is another type of error, requeue the item
+			c.appRefreshQueue.AddRateLimited(appKey)
+			return nil, fmt.Errorf("error getting deployment info: %s", err)
+		}
+
+		err = c.createResources(ctx, app)
+		if err != nil {
+			c.appRefreshQueue.AddRateLimited(appKey)
+			return nil, fmt.Errorf("error creating resources: %s", err)
+		}
+		c.queue.Forget(appKey)
+
+		return app, nil
+	}(appKey.(string))
+
+	if err != nil {
+		utilruntime.HandleError(err)
+		c.updateAppStatus(ctx, app, &v1alpha1.ApplicationStatus{
 			HealthStatus: v1alpha1.HealthStatusDegraded,
 		})
 	}
@@ -339,11 +408,11 @@ func (c *Controller) handleUdate(old, new interface{}) {
 
 	// Compare old and new spec
 	if equality.Semantic.DeepEqual(oldApp.Spec, newApp.Spec) {
-		log.Debugf("No changes in spec, skipping")
-		return
+		log.Debugf("No changes in application spec: %s", newApp.Name)
 	}
 
-	c.queue.AddRateLimited(new)
+	// TODO: use a cache instead of depending on Informer
+	c.requestAppRefresh(newApp.GetName(), newApp.GetNamespace())
 }
 
 // updateAppStatus to safely update the status of an application.
@@ -369,4 +438,9 @@ func (c *Controller) updateAppStatus(ctx context.Context, app *v1alpha1.Applicat
 	}
 
 	return nil
+}
+
+func (c *Controller) requestAppRefresh(appName string, namespace string) {
+	key := namespace + "/" + appName
+	c.appRefreshQueue.AddRateLimited(key)
 }
