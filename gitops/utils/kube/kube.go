@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/equality"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -232,7 +232,8 @@ func (k *k8s) DiffResources(current []*unstructured.Unstructured, new []*unstruc
 			continue
 		}
 
-		if !reflect.DeepEqual(c.Object["spec"], n.Object["spec"]) {
+		// TODO: handle kubernetes default values or else the comparison is useless
+		if !equality.Semantic.DeepEqual(c.Object["spec"], n.Object["spec"]) {
 			log.Debugf("Resource %s with name %s has changed", n.GetKind(), n.GetName())
 			isChanged = true
 		}
@@ -242,7 +243,7 @@ func (k *k8s) DiffResources(current []*unstructured.Unstructured, new []*unstruc
 	// Check if there are resources that need to be deleted
 	if len(hashTable) > 0 {
 		for _, c := range hashTable {
-			log.Debugf("Resource %s with name %s should be deleted", c.GetKind(), c.GetName())
+			log.Debugf("Resource %s with name %s not found, could be deleted or a child resource", c.GetKind(), c.GetName())
 		}
 		isChanged = true
 	}

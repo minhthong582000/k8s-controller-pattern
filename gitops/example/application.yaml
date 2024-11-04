@@ -2,8 +2,17 @@
 kind: Application
 apiVersion: thongdepzai.cloud/v1alpha1
 metadata:
-  name: example-application
+  name: nginx-application
 spec:
   repository: https://github.com/minhthong582000/k8s-controller-pattern.git
   revision: main
   path: gitops/example/nginx
+---
+kind: Application
+apiVersion: thongdepzai.cloud/v1alpha1
+metadata:
+  name: ubuntu-application
+spec:
+  repository: https://github.com/minhthong582000/k8s-controller-pattern.git
+  revision: main
+  path: gitops/example/ubuntu

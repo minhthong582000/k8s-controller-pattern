@@ -406,6 +406,11 @@ func (c *Controller) handleUdate(old, new interface{}) {
 		return
 	}
 
+	// If there are changes in fields other than spec, we don't need to reconcile
+	if !equality.Semantic.DeepEqual(oldApp.ObjectMeta, newApp.ObjectMeta) || !equality.Semantic.DeepEqual(oldApp.Status, newApp.Status) {
+		return
+	}
+
 	// Compare old and new spec
 	if equality.Semantic.DeepEqual(oldApp.Spec, newApp.Spec) {
 		log.Debugf("No changes in application spec: %s", newApp.Name)
