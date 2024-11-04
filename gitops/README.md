@@ -28,7 +28,7 @@ kubectl apply -Rf deploy/crds
 Apply example CR:
 
 ```bash
-kubectl apply -Rf deploy/example
+kubectl apply -Rf example/application.yaml
 ```
 
 Run the controller:
@@ -42,5 +42,5 @@ go run main.go run \
 Or you can run the controller in Kubernetes:
 
 ```bash
-kubectl apply -Rf deploy
+kubectl apply -Rf deploy/gitops-controller
 ```
