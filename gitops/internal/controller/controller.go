@@ -17,6 +17,7 @@ import (
 	"github.com/minhthong582000/k8s-controller-pattern/gitops/utils/git"
 	k8sutil "github.com/minhthong582000/k8s-controller-pattern/gitops/utils/kube"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/exp/rand"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -52,6 +53,8 @@ type Controller struct {
 	k8sUtil k8sutil.K8s
 
 	eventRecorder record.EventRecorder
+
+	resyncPeriod time.Duration
 }
 
 func NewController(
@@ -60,6 +63,7 @@ func NewController(
 	informer appinformers.ApplicationInformer,
 	gitUtil git.GitClient,
 	k8sUtil k8sutil.K8s,
+	resyncPeriod time.Duration,
 ) *Controller {
 	log.Info("Creating event broadcaster")
 	eventBroadcaster := record.NewBroadcaster()
@@ -83,6 +87,7 @@ func NewController(
 		gitUtil:       gitUtil,
 		k8sUtil:       k8sUtil,
 		eventRecorder: recorder,
+		resyncPeriod:  resyncPeriod,
 	}
 
 	informer.Informer().AddEventHandler(
@@ -416,6 +421,9 @@ func (c *Controller) handleUdate(old, new interface{}) {
 		log.Debugf("No changes in application spec: %s", newApp.Name)
 	}
 
+	jitter := c.jitter()
+	time.Sleep(jitter)
+
 	// TODO: use a cache instead of depending on Informer
 	c.requestAppRefresh(newApp.GetName(), newApp.GetNamespace())
 }
@@ -448,4 +456,8 @@ func (c *Controller) updateAppStatus(ctx context.Context, app *v1alpha1.Applicat
 func (c *Controller) requestAppRefresh(appName string, namespace string) {
 	key := namespace + "/" + appName
 	c.appRefreshQueue.AddRateLimited(key)
+}
+
+func (c *Controller) jitter() time.Duration {
+	return time.Duration(rand.Int63n(int64(c.resyncPeriod)))
 }

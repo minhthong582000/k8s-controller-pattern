@@ -76,7 +76,8 @@ var runCmd = &cobra.Command{
 		k8sutil := k8sutil.NewK8s(discoveryClient, dynClientSet)
 
 		// Set up the controller
-		appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, time.Second*30)
+		resyncPeriod := 30 * time.Second
+		appInformerFactory := appinformers.NewSharedInformerFactory(appClientSet, resyncPeriod)
 		stopCh := signals.SetupSignalHandler()
 		ctrl := controller.NewController(
 			clientSet,
@@ -84,6 +85,7 @@ var runCmd = &cobra.Command{
 			appInformerFactory.Thongdepzai().V1alpha1().Applications(),
 			gitUtil,
 			k8sutil,
+			resyncPeriod,
 		)
 		appInformerFactory.Start(stopCh)
 		if err = ctrl.Run(numWorkers, stopCh); err != nil {

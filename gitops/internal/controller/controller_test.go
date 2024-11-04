@@ -43,6 +43,7 @@ func newFakeController(gitClient git.GitClient, k8sUtil k8sUtil.K8s, apps ...run
 		appInformerFactory.Thongdepzai().V1alpha1().Applications(),
 		gitClient,
 		k8sUtil,
+		30*time.Second,
 	)
 }
 

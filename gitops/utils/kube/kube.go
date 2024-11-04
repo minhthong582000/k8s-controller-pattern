@@ -196,7 +196,7 @@ func (k *k8s) GetResourceWithLabel(label map[string]string) ([]*unstructured.Uns
 				var list *unstructured.UnstructuredList
 				list, err = k.dynClientSet.Resource(gvr).List(context.TODO(), listOption)
 				if err != nil {
-					log.Warningf("Error listing resource %s, %s", gvr.String(), err)
+					log.Debugf("Error listing resource %s, %s", gvr.String(), err)
 					continue
 				}
 
