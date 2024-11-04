@@ -8,6 +8,7 @@ require (
 	github.com/spf13/cobra v1.8.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.4.0
+	golang.org/x/exp v0.0.0-20241009180824-f66d83c29e7c
 	k8s.io/api v0.30.1
 	k8s.io/apimachinery v0.30.1
 	k8s.io/client-go v0.30.1
